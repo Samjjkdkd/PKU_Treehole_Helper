@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+    <!-- 树的主体 -->
+    <path d="M64 10 L40 50 L50 50 L35 80 L55 80 L45 120 L83 120 L73 80 L93 80 L78 50 L88 50 Z" 
+          fill="#4CAF50"/>
+    <!-- 星星 -->
+    <path d="M95 30 L100 40 L110 42 L102 50 L104 60 L95 55 L86 60 L88 50 L80 42 L90 40 Z" 
+          fill="#FFD700"/>
+</svg> 

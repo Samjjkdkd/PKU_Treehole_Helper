@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "PKU TreeHole Likes Counter",
+  "version": "1.0",
+  "description": "显示北大树洞帖子的收藏数据",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://treehole.pku.edu.cn/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://treehole.pku.edu.cn/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "icons": {
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+} 
