@@ -5,6 +5,59 @@ let timeLimit = null;
 let postsLimit = null;
 let startTime = null;
 let checkInterval = null;
+let scrollInterval = null;
+let isScrolling = false;
+
+// 自动滚动函数
+function autoScroll() {
+    if (isScrolling) return;
+    
+    isScrolling = true;
+    
+    // 使用用户提供的滚动容器
+    const scrollContainer = document.querySelector(".left-container");
+    if (!scrollContainer) {
+        console.error("[PKU TreeHole] 无法找到滚动容器");
+        isScrolling = false;
+        return;
+    }
+    
+    console.log("[PKU TreeHole] 开始自动滚动...");
+    
+    let scrollCount = 0;
+    const maxScrolls = 200; // 防止无限滚动
+    
+    // 清除可能存在的上一个滚动计时器
+    if (scrollInterval) {
+        clearInterval(scrollInterval);
+    }
+    
+    scrollInterval = setInterval(() => {
+        // 滚动页面
+        scrollContainer.scrollBy(0, 10000);
+        scrollCount++;
+        
+        // 检查是否需要停止滚动
+        const timeExpired = timeLimit && (Date.now() - startTime > timeLimit);
+        const reachedLimit = postsLimit && holesData.length >= postsLimit;
+        
+        if (timeExpired || reachedLimit || scrollCount > maxScrolls) {
+            clearInterval(scrollInterval);
+            scrollInterval = null;
+            isScrolling = false;
+            
+            if (timeExpired || reachedLimit) {
+                stopCollection();
+                scrollContainer.scrollTo({top: 0, behavior: 'smooth'});
+                console.log("[PKU TreeHole] 达到限制条件，停止滚动");
+            } else {
+                console.log("[PKU TreeHole] 滚动次数达到上限，短暂暂停后继续");
+                // 短暂暂停后继续滚动
+                setTimeout(autoScroll, 2000);
+            }
+        }
+    }, 500); // 每500毫秒滚动一次
+}
 
 // 处理帖子数据
 function processHoles() {
@@ -118,6 +171,9 @@ function startCollection(options) {
         checkInterval = setInterval(processHoles, 2000); // 每2秒检查一次新数据
     }
     
+    // 开始自动滚动
+    autoScroll();
+    
     // 返回当前已有的数据数量
     return holesData.length;
 }
@@ -131,6 +187,12 @@ function stopCollection() {
         clearInterval(checkInterval);
         checkInterval = null;
     }
+    
+    if (scrollInterval) {
+        clearInterval(scrollInterval);
+        scrollInterval = null;
+    }
+    isScrolling = false;
 }
 
 // 清空收集的数据
