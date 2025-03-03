@@ -68,19 +68,30 @@ function processHoles() {
         if (hole.dataset.processed) return;
         
         const likeNum = hole.querySelector('.box-header-badge.likenum');
+        const replyElement = hole.querySelector('.box-header-badge .icon-reply');
         const idElement = hole.querySelector('.box-id');
         const contentElement = hole.querySelector('.box-content');
+        const headerElement = hole.querySelector('.box-header');
         
-        if (likeNum && idElement && contentElement) {
+        if (likeNum && idElement && contentElement && headerElement) {
             const count = parseInt(likeNum.textContent.trim());
+            // 安全地获取评论数，如果元素不存在则默认为0
+            const replies = replyElement ? parseInt(replyElement.parentElement.textContent.trim()) : 0;
             const id = idElement.textContent.trim().replace('#', '').trim();
             const content = contentElement.textContent.trim();
+            
+            // 获取发布时间
+            const headerText = headerElement.textContent;
+            const timeMatch = headerText.match(/\d{2}-\d{2} \d{2}:\d{2}/);
+            const publishTime = timeMatch ? timeMatch[0] : '';
             
             // 存储数据
             const holeData = {
                 id: id,
                 content: content,
-                likeCount: count
+                likeCount: count,
+                replyCount: replies,
+                publishTime: publishTime
             };
             
             // 检查是否已存在该帖子
@@ -271,6 +282,14 @@ function createFloatingPanel() {
                 <input type="checkbox" id="auto-scroll" checked>
                 <label for="auto-scroll">启用自动滚动</label>
             </div>
+            <div class="sort-option">
+                <label>排序方式：</label>
+                <select id="sort-method">
+                    <option value="like">按收藏数排序</option>
+                    <option value="reply">按评论数排序</option>
+                    <option value="time">按发布时间排序</option>
+                </select>
+            </div>
             <div class="button-group">
                 <button id="start-btn">开始收集数据</button>
                 <button id="stop-btn">停止收集</button>
@@ -333,7 +352,26 @@ function createFloatingPanel() {
         }
         
         holesContainer.innerHTML = '';
-        const sortedHoles = holes.sort((a, b) => b.likeCount - a.likeCount);
+        const sortMethod = panel.querySelector('#sort-method').value;
+        
+        // 根据选择的方式排序
+        let sortedHoles = [...holes];
+        switch (sortMethod) {
+            case 'like':
+                sortedHoles.sort((a, b) => b.likeCount - a.likeCount);
+                break;
+            case 'reply':
+                sortedHoles.sort((a, b) => b.replyCount - a.replyCount);
+                break;
+            case 'time':
+                sortedHoles.sort((a, b) => {
+                    // 将时间字符串转换为可比较的格式
+                    const timeA = a.publishTime.split(' ').reverse().join(' ');
+                    const timeB = b.publishTime.split(' ').reverse().join(' ');
+                    return timeB.localeCompare(timeA);
+                });
+                break;
+        }
         
         sortedHoles.forEach(hole => {
             const holeDiv = document.createElement('div');
@@ -342,6 +380,8 @@ function createFloatingPanel() {
                 <div>
                     <span class="hole-id">#${hole.id}</span>
                     <span class="like-count">收藏数：${hole.likeCount}</span>
+                    <span class="reply-count">评论数：${hole.replyCount}</span>
+                    <span class="publish-time">${hole.publishTime}</span>
                 </div>
                 <div class="content">${hole.content}</div>
             `;
@@ -384,6 +424,11 @@ function createFloatingPanel() {
         clearHolesData();
         displayHoles([]);
         updateStatus("数据已清空");
+    });
+
+    // 添加排序方式变更监听
+    panel.querySelector('#sort-method').addEventListener('change', () => {
+        displayHoles(holesData);
     });
 
     // 定期更新显示

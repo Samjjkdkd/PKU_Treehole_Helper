@@ -86,6 +86,39 @@
     font-size: 14px;
 }
 
+.sort-option {
+    margin: 10px 0;
+    padding: 5px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sort-option label {
+    color: #666;
+    font-size: 14px;
+}
+
+.sort-option select {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+    color: #333;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.sort-option select:hover {
+    border-color: #4CAF50;
+}
+
+.sort-option select:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+}
+
 .button-group button {
     background-color: #4CAF50;
     color: white;
@@ -141,6 +174,18 @@
 .like-count {
     color: #e91e63;
     font-weight: bold;
+}
+
+.reply-count {
+    color: #2196F3;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+.publish-time {
+    color: #757575;
+    font-size: 12px;
+    margin-left: 10px;
 }
 
 .content {
