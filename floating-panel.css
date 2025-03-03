@@ -1,0 +1,128 @@
+#pku-treehole-panel {
+    position: fixed;
+    right: -350px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 350px;
+    background: white;
+    box-shadow: -2px 0 10px rgba(0,0,0,0.1);
+    transition: right 0.3s ease;
+    z-index: 9999;
+    border-radius: 8px 0 0 8px;
+    font-family: Arial, sans-serif;
+}
+
+#pku-treehole-panel:hover {
+    right: 0;
+}
+
+#pku-treehole-panel .tab {
+    position: absolute;
+    left: -30px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 30px;
+    height: 60px;
+    background: #4CAF50;
+    border-radius: 4px 0 0 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    font-size: 14px;
+}
+
+#pku-treehole-panel .panel-content {
+    padding: 10px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.config-panel {
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #f5f5f5;
+    border-radius: 4px;
+}
+
+.config-item {
+    margin: 8px 0;
+}
+
+.config-item label {
+    display: inline-block;
+    width: 120px;
+}
+
+.config-item input[type="number"] {
+    width: 80px;
+    padding: 4px;
+}
+
+.button-group button {
+    background-color: #4CAF50;
+    color: white;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: 10px;
+}
+
+.button-group button#stop-btn {
+    background-color: #f44336;
+    display: none;
+}
+
+.button-group button#clear-btn {
+    background-color: #9e9e9e;
+}
+
+.hole-item {
+    border: 1px solid #ddd;
+    margin: 5px 0;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.hole-id {
+    color: #1a73e8;
+    font-weight: bold;
+}
+
+.like-count {
+    color: #e91e63;
+    font-weight: bold;
+}
+
+.content {
+    margin-top: 5px;
+    color: #333;
+    word-break: break-all;
+}
+
+.loading {
+    text-align: center;
+    color: #666;
+    display: none;
+}
+
+.status {
+    margin-top: 10px;
+    padding: 5px;
+    background: #e8f5e9;
+    border-radius: 4px;
+    display: none;
+}
+
+.instruction {
+    margin: 10px 0;
+    padding: 8px;
+    background-color: #fff3cd;
+    border-radius: 4px;
+    color: #856404;
+    font-size: 12px;
+} 

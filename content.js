@@ -241,9 +241,131 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     return true;
 });
 
-// 页面加载完成后处理当前可见的帖子
+// 在文件开头添加面板创建代码
+function createFloatingPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'pku-treehole-panel';
+    
+    panel.innerHTML = `
+        <div class="tab">收藏统计</div>
+        <div class="panel-content">
+            <div class="instruction">
+                点击"开始收集数据"后，插件会自动滚动页面加载帖子，并收集排序展示收藏数据。
+            </div>
+            <div class="config-panel">
+                <div class="config-item">
+                    <label>最大收集时间(分钟):</label>
+                    <input type="number" id="time-limit" value="5" min="1" max="60">
+                </div>
+                <div class="config-item">
+                    <label>最大帖子数量:</label>
+                    <input type="number" id="posts-limit" value="3000" min="10" max="10000">
+                </div>
+            </div>
+            <div class="button-group">
+                <button id="start-btn">开始收集数据</button>
+                <button id="stop-btn">停止收集</button>
+                <button id="clear-btn">清空数据</button>
+            </div>
+            <div class="status" id="status-text"></div>
+            <div id="holes-container">
+                <div class="loading">正在收集数据...</div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(panel);
+    
+    // 添加事件监听器
+    const startBtn = panel.querySelector('#start-btn');
+    const stopBtn = panel.querySelector('#stop-btn');
+    const clearBtn = panel.querySelector('#clear-btn');
+    const holesContainer = panel.querySelector('#holes-container');
+    const loadingDiv = panel.querySelector('.loading');
+    const statusText = panel.querySelector('#status-text');
+    const timeLimitInput = panel.querySelector('#time-limit');
+    const postsLimitInput = panel.querySelector('#posts-limit');
+    
+    function updateStatus(text, isError = false) {
+        statusText.style.display = 'block';
+        statusText.style.background = isError ? '#ffebee' : '#e8f5e9';
+        statusText.textContent = text;
+    }
+
+    function displayHoles(holes) {
+        if (!holes || holes.length === 0) {
+            holesContainer.innerHTML = '<div class="no-data">暂无数据，请点击"开始收集数据"</div>';
+            return;
+        }
+        
+        holesContainer.innerHTML = '';
+        const sortedHoles = holes.sort((a, b) => b.likeCount - a.likeCount);
+        
+        sortedHoles.forEach(hole => {
+            const holeDiv = document.createElement('div');
+            holeDiv.className = 'hole-item';
+            holeDiv.innerHTML = `
+                <div>
+                    <span class="hole-id">#${hole.id}</span>
+                    <span class="like-count">收藏数：${hole.likeCount}</span>
+                </div>
+                <div class="content">${hole.content}</div>
+            `;
+            holesContainer.appendChild(holeDiv);
+        });
+    }
+
+    startBtn.addEventListener('click', function() {
+        startBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+        loadingDiv.style.display = 'block';
+        
+        const timeLimit = parseInt(timeLimitInput.value);
+        const postsLimit = parseInt(postsLimitInput.value);
+        
+        try {
+            const currentCount = startCollection({
+                timeLimit: timeLimit * 60 * 1000,
+                postsLimit: postsLimit
+            });
+            updateStatus(`开始收集数据，当前已有 ${currentCount || 0} 条数据`);
+        } catch (error) {
+            updateStatus('收集数据失败: ' + error.message, true);
+            stopCollection();
+        }
+    });
+
+    stopBtn.addEventListener('click', function() {
+        stopCollection();
+        startBtn.style.display = 'inline-block';
+        stopBtn.style.display = 'none';
+        loadingDiv.style.display = 'none';
+        updateStatus(`收集完成，共 ${holesData.length} 条数据`);
+        displayHoles(holesData);
+    });
+
+    clearBtn.addEventListener('click', function() {
+        clearHolesData();
+        displayHoles([]);
+        updateStatus("数据已清空");
+    });
+
+    // 定期更新显示
+    setInterval(() => {
+        if (isCollecting) {
+            displayHoles(holesData);
+            updateStatus(`已收集 ${holesData.length} 条数据`);
+        }
+    }, 1000);
+}
+
+// 在原有代码后面添加初始化调用
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadInitialData);
+    document.addEventListener('DOMContentLoaded', () => {
+        loadInitialData();
+        createFloatingPanel();
+    });
 } else {
     loadInitialData();
+    createFloatingPanel();
 } 
