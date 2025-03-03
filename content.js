@@ -34,7 +34,7 @@ function autoScroll() {
     
     scrollInterval = setInterval(() => {
         // 滚动页面
-        scrollContainer.scrollBy(0, 10000);
+        scrollContainer.scrollBy(0, 5000);
         scrollCount++;
         
         // 检查是否需要停止滚动
@@ -385,6 +385,34 @@ function createFloatingPanel() {
                 </div>
                 <div class="content">${hole.content}</div>
             `;
+
+            // 添加点击事件
+            holeDiv.addEventListener('click', () => {
+                // 查找对应的帖子元素
+                const targetHole = Array.from(document.querySelectorAll('.flow-item-row')).find(item => {
+                    const idElement = item.querySelector('.box-id');
+                    return idElement && idElement.textContent.trim().replace('#', '').trim() === hole.id;
+                });
+
+                if (targetHole) {
+                    // 收起面板
+                    panel.classList.remove('expanded');
+                    isExpanded = false;
+
+                    // 滚动到目标位置
+                    targetHole.scrollIntoView({ behavior: "smooth", block: "center" });
+                    
+                    // 添加高亮效果
+                    targetHole.style.transition = 'background-color 0.3s ease';
+                    targetHole.style.backgroundColor = '#fff3cd';
+                    setTimeout(() => {
+                        targetHole.style.backgroundColor = '';
+                    }, 1000);
+                }
+            });
+
+            // 添加鼠标悬停效果
+            holeDiv.style.cursor = 'pointer';
             holesContainer.appendChild(holeDiv);
         });
     }
