@@ -285,6 +285,31 @@ function createFloatingPanel() {
     const statusText = panel.querySelector('#status-text');
     const timeLimitInput = panel.querySelector('#time-limit');
     const postsLimitInput = panel.querySelector('#posts-limit');
+    const tab = panel.querySelector('.tab');
+    
+    // 添加点击切换面板状态的功能
+    let isExpanded = false;
+    tab.addEventListener('click', () => {
+        isExpanded = !isExpanded;
+        if (isExpanded) {
+            panel.classList.add('expanded');
+        } else {
+            panel.classList.remove('expanded');
+        }
+    });
+    
+    // 点击面板内容区域时阻止事件冒泡，防止点击内容时收起面板
+    panel.querySelector('.panel-content').addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+    
+    // 点击页面其他区域时收起面板
+    document.addEventListener('click', (e) => {
+        if (!panel.contains(e.target) && isExpanded) {
+            isExpanded = false;
+            panel.classList.remove('expanded');
+        }
+    });
     
     function updateStatus(text, isError = false) {
         statusText.style.display = 'block';
@@ -354,7 +379,8 @@ function createFloatingPanel() {
     setInterval(() => {
         if (isCollecting) {
             displayHoles(holesData);
-            updateStatus(`已收集 ${holesData.length} 条数据`);
+            const elapsedTime = (Date.now() - startTime) / 1000;
+            updateStatus(`已收集 ${holesData.length} 条数据，用时 ${elapsedTime.toFixed(0)} 秒`);
         }
     }, 1000);
 }

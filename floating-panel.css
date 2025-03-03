@@ -12,7 +12,7 @@
     font-family: Arial, sans-serif;
 }
 
-#pku-treehole-panel:hover {
+#pku-treehole-panel.expanded {
     right: 0;
 }
 
@@ -33,6 +33,11 @@
     writing-mode: vertical-rl;
     text-orientation: mixed;
     font-size: 14px;
+    user-select: none;
+}
+
+#pku-treehole-panel .tab:hover {
+    background: #45a049;
 }
 
 #pku-treehole-panel .panel-content {
@@ -70,6 +75,19 @@
     border-radius: 4px;
     cursor: pointer;
     margin-right: 10px;
+    transition: background-color 0.3s ease;
+}
+
+.button-group button:hover {
+    opacity: 0.9;
+}
+
+.button-group button#start-btn {
+    background-color: #4CAF50;
+}
+
+.button-group button#start-btn:hover {
+    background-color: #45a049;
 }
 
 .button-group button#stop-btn {
@@ -77,8 +95,16 @@
     display: none;
 }
 
+.button-group button#stop-btn:hover {
+    background-color: #e53935;
+}
+
 .button-group button#clear-btn {
     background-color: #9e9e9e;
+}
+
+.button-group button#clear-btn:hover {
+    background-color: #757575;
 }
 
 .hole-item {
