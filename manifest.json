@@ -19,7 +19,7 @@
     }
   ],
   "web_accessible_resources": [{
-    "resources": ["icon/icon48.png"],
+    "resources": ["icon/icon48.png", "assets/html2canvas.min.js", "assets/html2canvas-executor.js"],
     "matches": ["https://treehole.pku.edu.cn/*"]
   }],
   "icons": {

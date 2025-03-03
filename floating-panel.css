@@ -33,6 +33,7 @@
     color: white;
     user-select: none;
     padding: 8px 0;
+    transition: all 0.3s ease;
 }
 
 #pku-treehole-panel .tab::before {
@@ -50,6 +51,8 @@
     width: 24px;
     height: 24px;
     object-fit: contain;
+    transition: all 0.3s ease;
+    filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0));
 }
 
 #pku-treehole-panel .tab .text {
@@ -60,8 +63,28 @@
     line-height: 1.2;
 }
 
+/* 根据主题自定义悬停效果 */
 #pku-treehole-panel .tab:hover {
-    background: #222222;
+    background-color: #181818 !important; /* 默认为深色主题的悬停效果：更深的灰色 */
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0.3); /* 添加阴影效果增强视觉变化 */
+    transition: all 0.3s ease; /* 平滑过渡效果 */
+}
+
+/* 浅色主题特定的悬停效果 */
+#pku-treehole-panel .tab[data-theme="light"]:hover {
+    background-color: #e0e0e0 !important; /* 浅色主题的悬停效果：更明显的灰色对比 */
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0.2); /* 添加阴影效果 */
+}
+
+#pku-treehole-panel .tab:hover .icon {
+    transform: scale(1.15); /* 增大图标缩放比例 */
+    transition: transform 0.3s ease;
+    filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0.5)); /* 添加发光效果 */
+}
+
+/* 浅色主题特定的图标悬停效果 */
+#pku-treehole-panel .tab[data-theme="light"]:hover .icon {
+    filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0.3)); /* 浅色主题下的暗色发光效果 */
 }
 
 #pku-treehole-panel .panel-content {

@@ -11,6 +11,44 @@ let endTime = null;
 let commentsData = []; // 存储评论数据
 let allCommentsData = []; // 存储所有收集到的评论数据
 let speakerList = new Set(); // 存储所有发言人列表
+let statusTextElement = null; // 状态文本元素引用
+let tabElement = null; // tab元素引用
+
+// 全局状态更新函数
+function updateGlobalStatus(text, isError = false) {
+    if (statusTextElement) {
+        statusTextElement.style.display = 'block';
+        statusTextElement.style.background = isError ? '#ffebee' : '#e8f5e9';
+        statusTextElement.textContent = text;
+    } else {
+        console.log(`状态更新: ${text}${isError ? ' (错误)' : ''}`);
+    }
+}
+
+// 检查并应用主题颜色到tab
+function applyThemeToTab() {
+    // 获取页面的计算样式
+    const rootStyles = getComputedStyle(document.documentElement);
+    // 读取--theme_font_color变量，如果不存在则检查文本颜色
+    const fontColor = rootStyles.getPropertyValue('--theme_font_color').trim() || 
+                      getComputedStyle(document.body).color;
+    
+    // 如果fontColor是黑色或接近黑色（浅色主题），则应用浅色背景
+    if (fontColor === '#000' || fontColor === '#000000' || fontColor === 'rgb(0, 0, 0)') {
+        if (tabElement) {
+            tabElement.style.backgroundColor = '#f0f0f0'; // 浅灰色背景
+            tabElement.style.color = '#333'; // 深色文本，提高对比度
+            tabElement.dataset.theme = 'light'; // 设置数据属性表示当前是浅色主题
+        }
+    } else {
+        // 恢复默认的深色背景
+        if (tabElement) {
+            tabElement.style.backgroundColor = '#333333'; // 恢复默认深灰色背景
+            tabElement.style.color = 'white'; // 恢复默认白色文本
+            tabElement.dataset.theme = 'dark'; // 设置数据属性表示当前是深色主题
+        }
+    }
+}
 
 // 评论自动滚动相关变量
 let commentsScrollInterval = null;
@@ -293,6 +331,61 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 
 // 在文件开头添加面板创建代码
 function createFloatingPanel() {
+    // 创建通用的按钮悬浮效果样式
+    const floatingPanelStyles = document.createElement('style');
+    floatingPanelStyles.textContent = `
+        /* 按钮悬浮效果 */
+        .treehole-btn-hover {
+            transition: transform 0.2s ease, background-color 0.2s ease, opacity 0.2s ease !important;
+        }
+        .treehole-btn-hover:hover {
+            transform: scale(1.05) !important;
+        }
+        
+        /* 针对开始按钮的特殊效果 */
+        #start-btn:hover {
+            background-color: #0f5bdb !important;
+            filter: brightness(1.1);
+        }
+        
+        /* 针对停止按钮的特殊效果 */
+        #stop-btn:hover {
+            background-color: #d32f2f !important;
+            filter: brightness(1.1);
+        }
+        
+        /* 针对导出按钮的特殊效果 */
+        #export-text-btn:hover {
+            background-color: #2E7D32 !important;
+            filter: brightness(1.1);
+        }
+        
+        #export-image-btn:hover {
+            background-color: #1565C0 !important;
+            filter: brightness(1.1);
+        }
+        
+        /* 小按钮的悬浮效果 */
+        .small-btn:hover {
+            transform: scale(1.1) !important;
+            background-color: #666 !important;
+        }
+        
+        /* 输入框的焦点效果 */
+        .config-item input:focus {
+            border-color: #1a73e8 !important;
+            box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2) !important;
+            transform: scale(1.02);
+        }
+        
+        /* 下拉框的悬浮效果 */
+        .sort-option select:hover {
+            border-color: #1a73e8 !important;
+            transform: scale(1.05);
+        }
+    `;
+    document.head.appendChild(floatingPanelStyles);
+    
     const panel = document.createElement('div');
     panel.id = 'pku-treehole-panel';
     
@@ -316,7 +409,7 @@ function createFloatingPanel() {
                 <div class="config-item">
                     <label>最早发布时间:</label>
                     <input type="datetime-local" id="end-time" step="60">
-                    <button id="clear-time" class="small-btn">清除</button>
+                    <button id="clear-time" class="small-btn treehole-btn-hover">清除</button>
                 </div>
             </div>
             <div class="auto-scroll-option">
@@ -332,9 +425,12 @@ function createFloatingPanel() {
                 </select>
             </div>
             <div class="button-group">
-                <button id="start-btn">开始收集数据</button>
-                <button id="stop-btn">停止收集</button>
-                <button id="clear-btn">清空数据</button>
+                <button id="start-btn" class="treehole-btn-hover">开始收集数据</button>
+                <button id="stop-btn" class="treehole-btn-hover">停止收集</button>
+            </div>
+            <div class="export-group" style="margin-top: 10px; display: flex; justify-content: space-between;">
+                <button id="export-text-btn" class="treehole-btn-hover" style="flex: 1; margin-right: 5px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; padding: 6px 8px; cursor: pointer; font-size: 13px;">导出文本</button>
+                <button id="export-image-btn" class="treehole-btn-hover" style="flex: 1; margin-left: 5px; background-color: #2196F3; color: white; border: none; border-radius: 4px; padding: 6px 8px; cursor: pointer; font-size: 13px;">导出图片</button>
             </div>
             <div class="status" id="status-text"></div>
             <div id="holes-container">
@@ -345,10 +441,40 @@ function createFloatingPanel() {
     
     document.body.appendChild(panel);
     
+    // 保存tab元素的引用
+    tabElement = panel.querySelector('.tab');
+    
+    // 初始应用主题颜色
+    applyThemeToTab();
+    
+    // 添加MutationObserver监听主题颜色变化
+    const observer = new MutationObserver(applyThemeToTab);
+    observer.observe(document.documentElement, { 
+        attributes: true, 
+        attributeFilter: ['style', 'class'] 
+    });
+    
+    // 每分钟检查一次主题颜色，以防MutationObserver未捕获到变化
+    setInterval(applyThemeToTab, 60000);
+    
+    // 对悬浮窗中的元素添加悬浮效果
+    // 为输入框添加过渡效果
+    const inputs = panel.querySelectorAll('input[type="number"], input[type="datetime-local"]');
+    inputs.forEach(input => {
+        input.style.transition = 'all 0.2s ease';
+    });
+    
+    // 为下拉框添加过渡效果
+    const selects = panel.querySelectorAll('select');
+    selects.forEach(select => {
+        select.style.transition = 'all 0.2s ease';
+    });
+    
     // 添加事件监听器
     const startBtn = panel.querySelector('#start-btn');
     const stopBtn = panel.querySelector('#stop-btn');
-    const clearBtn = panel.querySelector('#clear-btn');
+    const exportTextBtn = panel.querySelector('#export-text-btn');
+    const exportImageBtn = panel.querySelector('#export-image-btn');
     const holesContainer = panel.querySelector('#holes-container');
     const loadingDiv = panel.querySelector('.loading');
     const statusText = panel.querySelector('#status-text');
@@ -381,9 +507,8 @@ function createFloatingPanel() {
     });
     
     function updateStatus(text, isError = false) {
-        statusText.style.display = 'block';
-        statusText.style.background = isError ? '#ffebee' : '#e8f5e9';
-        statusText.textContent = text;
+        statusTextElement = statusText; // 保存对状态文本元素的引用
+        updateGlobalStatus(text, isError);
     }
 
     function displayHoles(holes) {
@@ -415,7 +540,7 @@ function createFloatingPanel() {
         
         sortedHoles.forEach(hole => {
             const holeDiv = document.createElement('div');
-            holeDiv.className = 'hole-item';
+            holeDiv.className = 'hole-item treehole-item-hover';
             holeDiv.innerHTML = `
                 <div>
                     <span class="hole-id">#${hole.id}</span>
@@ -426,6 +551,21 @@ function createFloatingPanel() {
                 </div>
                 <div class="content">${hole.content}</div>
             `;
+            
+            // 设置悬浮效果样式
+            holeDiv.style.transition = 'all 0.2s ease';
+            holeDiv.onmouseover = () => {
+                holeDiv.style.transform = 'translateX(-2px) scale(1.01)';
+                holeDiv.style.backgroundColor = '#f5f8ff';
+                holeDiv.style.borderColor = '#1a73e8';
+                holeDiv.style.boxShadow = '0 2px 5px rgba(26, 115, 232, 0.1)';
+            };
+            holeDiv.onmouseout = () => {
+                holeDiv.style.transform = 'translateX(0) scale(1)';
+                holeDiv.style.backgroundColor = '';
+                holeDiv.style.borderColor = '#ddd';
+                holeDiv.style.boxShadow = 'none';
+            };
 
             // 添加点击事件
             holeDiv.addEventListener('click', () => {
@@ -473,6 +613,16 @@ function createFloatingPanel() {
     
     clearTimeBtn.addEventListener('click', () => {
         endTimeInput.value = '';
+        
+        // 添加视觉反馈
+        clearTimeBtn.style.backgroundColor = '#4CAF50';
+        clearTimeBtn.textContent = '已清除';
+        
+        // 0.8秒后恢复原样
+        setTimeout(() => {
+            clearTimeBtn.style.backgroundColor = '';
+            clearTimeBtn.textContent = '清除';
+        }, 800);
     });
 
     startBtn.addEventListener('click', function() {
@@ -536,10 +686,12 @@ function createFloatingPanel() {
         displayHoles(holesData);
     });
 
-    clearBtn.addEventListener('click', function() {
-        clearHolesData();
-        displayHoles([]);
-        updateStatus("数据已清空");
+    exportTextBtn.addEventListener('click', function() {
+        exportHolesAsText();
+    });
+
+    exportImageBtn.addEventListener('click', function() {
+        exportHolesAsImage();
     });
 
     // 添加排序方式变更监听
@@ -570,10 +722,22 @@ function createCommentCollectorButton() {
     
     // 创建按钮
     const button = document.createElement('a');
-    button.className = 'comment-collector-btn no-underline mr10';
-    button.innerHTML = `<img src="${chrome.runtime.getURL('icon/icon48.png')}" alt="收集评论" style="width: 20px; height: 20px; vertical-align: middle;">`;
+    button.className = 'comment-collector-btn no-underline mr10 treehole-btn-hover';
+    button.innerHTML = `<img src="${chrome.runtime.getURL('icon/icon48.png')}" alt="收集评论" style="width: 20px; height: 20px; vertical-align: middle;" class="collector-icon">`;
     button.style.cursor = 'pointer';
     button.title = '收集树洞评论';
+    
+    // 添加样式标签，使图标有更明显的放大效果和过渡动画
+    const iconStyle = document.createElement('style');
+    iconStyle.textContent = `
+        .collector-icon {
+            transition: transform 0.2s ease !important;
+        }
+        .comment-collector-btn:hover .collector-icon {
+            transform: scale(1.2) !important;
+        }
+    `;
+    document.head.appendChild(iconStyle);
     
     // 将按钮添加到标题栏
     const titleActions = sidebarTitle.querySelector('div');
@@ -618,15 +782,41 @@ function showCommentCollectorDialog() {
     dialog.style.overflow = 'hidden'; // 防止内容溢出
     dialog.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", sans-serif';
     
+    // 按钮的通用悬浮效果样式
+    const buttonHoverStyles = `
+        .hover-effect {
+            transition: transform 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+        }
+        .hover-effect:hover {
+            transform: scale(1.05);
+        }
+        /* 特定按钮颜色变化 */
+        #close-comment-dialog:hover {
+            color: #ff0000 !important;
+            transform: scale(1.2) !important;
+        }
+        #toggle-collect-comments:hover {
+            filter: brightness(1.1);
+        }
+        #export-text:hover, #export-image:hover {
+            filter: brightness(1.1);
+        }
+    `;
+    
+    // 创建样式元素
+    const style = document.createElement('style');
+    style.textContent = buttonHoverStyles;
+    document.head.appendChild(style);
+    
     dialog.innerHTML = `
         <div id="comment-dialog-header" style="display: flex; justify-content: space-between; align-items: center; background-color: #f5f5f5; padding: 10px 15px; border-radius: 8px 8px 0 0; cursor: move; user-select: none; flex-shrink: 0;">
             <h3 style="margin: 0; font-size: 16px; color: #333;">收集树洞评论</h3>
-            <button id="close-comment-dialog" style="background: none; border: none; cursor: pointer; font-size: 18px; color: #666;">&times;</button>
+            <button id="close-comment-dialog" class="hover-effect" style="background: none; border: none; cursor: pointer; font-size: 18px; color: #666;">&times;</button>
         </div>
         <div id="comment-dialog-content" style="padding: 15px; flex-grow: 1; overflow-y: auto;">
             <div id="comment-collector-controls" style="margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <button id="toggle-collect-comments" class="action-button" style="background-color: #1a73e8; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; min-width: 100px;">开始收集</button>
+                    <button id="toggle-collect-comments" class="action-button hover-effect" style="background-color: #1a73e8; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; min-width: 100px;">开始收集</button>
                     <div style="display: flex; align-items: center;">
                         <input type="checkbox" id="auto-scroll-comments" style="margin-right: 5px;">
                         <label for="auto-scroll-comments" style="cursor: pointer; font-size: 14px;">自动滚动</label>
@@ -661,8 +851,8 @@ function showCommentCollectorDialog() {
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span style="font-size: 13px;">导出评论：</span>
                         <div style="display: flex; gap: 8px;">
-                            <button id="export-text" style="background-color: #4CAF50; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 13px;">文本格式</button>
-                            <button id="export-image" style="background-color: #2196F3; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 13px;">图片格式</button>
+                            <button id="export-text" class="hover-effect" style="background-color: #4CAF50; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 13px;">文本格式</button>
+                            <button id="export-image" class="hover-effect" style="background-color: #2196F3; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 13px;">图片格式</button>
                         </div>
                     </div>
                 </div>
@@ -1570,7 +1760,8 @@ function exportAsImage() {
     
     // 获取帖子信息
     const holeTitle = document.querySelector('.sidebar-title.sidebar-top');
-    const holeId = holeTitle ? holeTitle.textContent.trim() : '未知帖子';
+    const holeTitleMatch = holeTitle ? holeTitle.textContent.match(/#\d+/) : null;
+    const holeId = holeTitleMatch ? holeTitleMatch[0] : (holeTitle ? holeTitle.textContent.trim() : '未知帖子');
     const speakerFilter = document.getElementById('speaker-filter');
     const selectedSpeaker = speakerFilter && speakerFilter.value ? speakerFilter.value : '全部';
     
@@ -1590,7 +1781,7 @@ function exportAsImage() {
     header.style.paddingBottom = '10px';
     
     header.innerHTML = `
-        <h2 style="margin: 0 0 10px 0;">${holeId} 评论导出</h2>
+        <h2 style="margin: 0 0 10px 0;">${holeId}</h2>
         <div style="color: #666; font-size: 14px;">
             <div>导出时间：${new Date().toLocaleString()}</div>
             <div>评论数量：${allCommentsData.length} (显示: ${selectedSpeaker === '全部' ? '全部' : `只看 ${selectedSpeaker}`})</div>
@@ -1612,8 +1803,8 @@ function exportAsImage() {
     
     // 使用html2canvas截图
     loadHtml2Canvas()
-        .then(() => {
-            return html2canvas(tempContainer, {
+        .then((html2canvasFunc) => {
+            return html2canvasFunc(tempContainer, {
                 backgroundColor: '#ffffff',
                 scale: 2,
                 logging: false,
@@ -1628,7 +1819,7 @@ function exportAsImage() {
             const imageUrl = canvas.toDataURL('image/png');
             
             // 设置文件名
-            const fileName = `PKU_TreeHole_Comments_${holeId.replace('#', '')}_${new Date().getTime()}.png`;
+            const fileName = `TreeHole${holeId}_${new Date().getTime()}.png`;
             
             // 创建并触发下载
             const a = document.createElement('a');
@@ -1654,18 +1845,109 @@ function exportAsImage() {
 // 动态加载html2canvas库
 function loadHtml2Canvas() {
     return new Promise((resolve, reject) => {
-        // 检查是否已加载
-        if (window.html2canvas) {
-            resolve();
+        // 检查是否已加载过
+        if (window.__html2canvasReady) {
+            resolve(window.__html2canvasCaptureFunc);
             return;
         }
         
-        // 加载脚本
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
-        script.onload = resolve;
-        script.onerror = () => reject(new Error('无法加载html2canvas库'));
-        document.head.appendChild(script);
+        // 注入脚本加载函数
+        function injectScript(src, onError) {
+            const script = document.createElement('script');
+            script.src = src;
+            script.onerror = onError;
+            document.head.appendChild(script);
+            return script;
+        }
+        
+        // 创建截图函数
+        const createCaptureFunction = () => {
+            return (element, options) => {
+                return new Promise((resolveCapture, rejectCapture) => {
+                    const captureId = 'capture_' + Date.now();
+                    
+                    // 监听结果
+                    const captureListener = (event) => {
+                        if (!event.data || 
+                            event.data.type !== 'HTML2CANVAS_RESULT' || 
+                            event.data.captureId !== captureId) return;
+                        
+                        window.removeEventListener('message', captureListener);
+                        
+                        if (event.data.error) {
+                            rejectCapture(new Error(event.data.error));
+                            return;
+                        }
+                        
+                        // 从数据URL创建Canvas
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0);
+                            resolveCapture(canvas);
+                        };
+                        img.onerror = () => rejectCapture(new Error('无法从数据URL创建图像'));
+                        img.src = event.data.dataUrl;
+                    };
+                    
+                    window.addEventListener('message', captureListener);
+                    
+                    // 使用临时ID标记元素
+                    const tempId = 'html2canvas_temp_' + Date.now();
+                    const originalId = element.id;
+                    element.id = tempId;
+                    
+                    // 发送捕获请求
+                    window.postMessage({
+                        type: 'HTML2CANVAS_CAPTURE_REQUEST',
+                        captureId: captureId,
+                        selector: '#' + tempId,
+                        options: options
+                    }, '*');
+                    
+                    // 恢复原始ID
+                    setTimeout(() => {
+                        if (originalId) {
+                            element.id = originalId;
+                        } else {
+                            element.removeAttribute('id');
+                        }
+                    }, 0);
+                });
+            };
+        };
+        
+        // 监听执行器加载完成的消息
+        const executorLoadedListener = (event) => {
+            if (event.data && event.data.type === 'HTML2CANVAS_EXECUTOR_LOADED') {
+                window.removeEventListener('message', executorLoadedListener);
+                
+                // 创建并保存截图函数
+                const captureFunc = createCaptureFunction();
+                window.__html2canvasCaptureFunc = captureFunc;
+                window.__html2canvasReady = true;
+                
+                resolve(captureFunc);
+            }
+        };
+        
+        window.addEventListener('message', executorLoadedListener);
+        
+        // 先加载html2canvas库，然后加载执行器
+        const html2canvasScript = injectScript(
+            chrome.runtime.getURL('assets/html2canvas.min.js'),
+            () => reject(new Error('无法加载html2canvas库'))
+        );
+        
+        html2canvasScript.onload = () => {
+            injectScript(
+                chrome.runtime.getURL('assets/html2canvas-executor.js'),
+                () => reject(new Error('无法加载html2canvas执行器'))
+            );
+        };
     });
 }
 
@@ -1683,3 +1965,212 @@ if (document.readyState === 'loading') {
     observeSidebarChanges();
     addCommentCollectorStyles();
 } 
+
+// 导出悬浮窗中的树洞数据为文本格式
+function exportHolesAsText() {
+    if (!holesData || holesData.length === 0) {
+        updateGlobalStatus('没有可导出的数据，请先收集数据', true);
+        return;
+    }
+    
+    // 获取当前显示的排序方式
+    const sortMethod = document.querySelector('#sort-method').value;
+    
+    // 生成文本内容
+    let textContent = `# PKU树洞数据导出\n`;
+    textContent += `# 导出时间：${new Date().toLocaleString()}\n`;
+    textContent += `# 帖子数量：${holesData.length}\n`;
+    textContent += `# 排序方式：${getSortMethodName(sortMethod)}\n`;
+    
+    // 获取最早和最新的帖子时间
+    const timeData = holesData.map(hole => {
+        const parts = hole.publishTime.split(' ');
+        return parts.length > 1 ? parts[1] + ' ' + parts[0] : hole.publishTime;
+    }).sort();
+    
+    if (timeData.length > 0) {
+        textContent += `# 时间范围：${timeData[0]} 至 ${timeData[timeData.length - 1]}\n`;
+    }
+    
+    textContent += `\n-------------------------------\n\n`;
+    
+    // 根据当前排序方式排序
+    let sortedHoles = [...holesData];
+    switch (sortMethod) {
+        case 'like':
+            sortedHoles.sort((a, b) => b.likeCount - a.likeCount);
+            break;
+        case 'reply':
+            sortedHoles.sort((a, b) => b.replyCount - a.replyCount);
+            break;
+        case 'time':
+            sortedHoles.sort((a, b) => {
+                const timeA = a.publishTime.split(' ').reverse().join(' ');
+                const timeB = b.publishTime.split(' ').reverse().join(' ');
+                return timeB.localeCompare(timeA);
+            });
+            break;
+    }
+    
+    // 添加每个树洞的数据
+    sortedHoles.forEach((hole, index) => {
+        textContent += `[${index + 1}] ID: #${hole.id} | 收藏数: ${hole.likeCount} | 评论数: ${hole.replyCount} | 发布时间: ${hole.publishTime}\n\n`;
+        textContent += `${hole.content || '无内容'}\n\n`;
+        textContent += `-------------------------------\n\n`;
+    });
+    
+    // 创建下载链接
+    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    
+    // 设置文件名
+    const fileName = `PKU_TreeHole_导出_${new Date().getTime()}.txt`;
+    
+    // 创建并触发下载
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    
+    // 清理资源
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+    
+    updateGlobalStatus(`已导出 ${sortedHoles.length} 条帖子数据为文本文件`);
+}
+
+// 导出悬浮窗中的树洞数据为图片格式
+function exportHolesAsImage() {
+    if (!holesData || holesData.length === 0) {
+        updateGlobalStatus('没有可导出的数据，请先收集数据', true);
+        return;
+    }
+    
+    // 创建一个临时容器用于生成图片
+    const tempContainer = document.createElement('div');
+    tempContainer.style.backgroundColor = '#ffffff';
+    tempContainer.style.padding = '20px';
+    tempContainer.style.fontFamily = 'Arial, sans-serif';
+    tempContainer.style.width = '800px';
+    tempContainer.style.position = 'absolute';
+    tempContainer.style.left = '-9999px';
+    tempContainer.style.top = '-9999px';
+    
+    // 获取当前显示的排序方式
+    const sortMethod = document.querySelector('#sort-method').value;
+    
+    // 添加标题和统计信息
+    tempContainer.innerHTML = `
+        <div style="text-align: center; margin-bottom: 20px;">
+            <h2 style="margin: 0; color: #1a73e8;">PKU树洞数据导出</h2>
+            <p style="color: #666; margin: 5px 0;">导出时间：${new Date().toLocaleString()}</p>
+            <p style="color: #666; margin: 5px 0;">帖子数量：${holesData.length}</p>
+            <p style="color: #666; margin: 5px 0;">排序方式：${getSortMethodName(sortMethod)}</p>
+        </div>
+        <div style="border-top: 1px solid #ddd; margin: 10px 0;"></div>
+    `;
+    
+    // 根据当前排序方式排序
+    let sortedHoles = [...holesData];
+    switch (sortMethod) {
+        case 'like':
+            sortedHoles.sort((a, b) => b.likeCount - a.likeCount);
+            break;
+        case 'reply':
+            sortedHoles.sort((a, b) => b.replyCount - a.replyCount);
+            break;
+        case 'time':
+            sortedHoles.sort((a, b) => {
+                const timeA = a.publishTime.split(' ').reverse().join(' ');
+                const timeB = b.publishTime.split(' ').reverse().join(' ');
+                return timeB.localeCompare(timeA);
+            });
+            break;
+    }
+    
+    // 只展示前30条数据，防止图片过大
+    const displayHoles = sortedHoles.slice(0, 30);
+    
+    // 创建每个树洞的卡片
+    displayHoles.forEach((hole, index) => {
+        const holeCard = document.createElement('div');
+        holeCard.style.border = '1px solid #ddd';
+        holeCard.style.borderRadius = '8px';
+        holeCard.style.padding = '15px';
+        holeCard.style.marginBottom = '15px';
+        holeCard.style.backgroundColor = '#f8f9fa';
+        
+        holeCard.innerHTML = `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <span style="font-weight: bold; color: #1a73e8;">#${hole.id}</span>
+                <div>
+                    <span style="margin-right: 15px; color: #e91e63;">收藏数：${hole.likeCount}</span>
+                    <span style="margin-right: 15px; color: #2196F3;">评论数：${hole.replyCount}</span>
+                    <span style="color: #666;">${hole.publishTime}</span>
+                </div>
+            </div>
+            <div style="margin-bottom: 10px; line-height: 1.5; color: #333; word-break: break-all;">${hole.content || '无内容'}</div>
+        `;
+        
+        tempContainer.appendChild(holeCard);
+    });
+    
+    // 如果有更多数据但没有显示，添加提示
+    if (sortedHoles.length > 30) {
+        const moreInfo = document.createElement('div');
+        moreInfo.style.textAlign = 'center';
+        moreInfo.style.color = '#666';
+        moreInfo.style.padding = '10px';
+        moreInfo.textContent = `注：图片中仅显示前30条数据，共有 ${sortedHoles.length} 条数据。请使用文本导出获取完整数据。`;
+        tempContainer.appendChild(moreInfo);
+    }
+    
+    // 添加到文档以便截图
+    document.body.appendChild(tempContainer);
+    
+    // 使用html2canvas截图
+    loadHtml2Canvas()
+        .then((html2canvasFunc) => {
+            return html2canvasFunc(tempContainer, {
+                backgroundColor: '#ffffff',
+                scale: 2,
+                logging: false,
+                useCORS: true
+            });
+        })
+        .then(canvas => {
+            // 移除临时容器
+            document.body.removeChild(tempContainer);
+            
+            // 将canvas转换为图片并下载
+            const imgData = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = imgData;
+            link.download = `PKU_TreeHole_导出_${new Date().getTime()}.png`;
+            link.click();
+            
+            updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+        })
+        .catch(error => {
+            // 确保在出错时也移除临时容器
+            if (document.body.contains(tempContainer)) {
+                document.body.removeChild(tempContainer);
+            }
+            console.error('导出图片失败:', error);
+            updateGlobalStatus('导出图片失败，请重试', true);
+        });
+}
+
+// 获取排序方式的中文名称
+function getSortMethodName(method) {
+    switch (method) {
+        case 'like': return '按收藏数排序';
+        case 'reply': return '按评论数排序';
+        case 'time': return '按发布时间排序';
+        default: return '未知排序方式';
+    }
+}
