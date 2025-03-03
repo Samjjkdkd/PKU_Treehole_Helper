@@ -67,6 +67,25 @@
     padding: 4px;
 }
 
+.auto-scroll-option {
+    margin: 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.auto-scroll-option input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.auto-scroll-option label {
+    cursor: pointer;
+    user-select: none;
+    color: #666;
+    font-size: 14px;
+}
+
 .button-group button {
     background-color: #4CAF50;
     color: white;

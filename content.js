@@ -171,8 +171,13 @@ function startCollection(options) {
         checkInterval = setInterval(processHoles, 2000); // 每2秒检查一次新数据
     }
     
-    // 开始自动滚动
-    autoScroll();
+    // 根据选项决定是否开始自动滚动
+    if (options.autoScroll) {
+        console.log("[PKU TreeHole] 启用自动滚动");
+        autoScroll();
+    } else {
+        console.log("[PKU TreeHole] 禁用自动滚动");
+    }
     
     // 返回当前已有的数据数量
     return holesData.length;
@@ -262,6 +267,10 @@ function createFloatingPanel() {
                     <input type="number" id="posts-limit" value="3000" min="10" max="10000">
                 </div>
             </div>
+            <div class="auto-scroll-option">
+                <input type="checkbox" id="auto-scroll" checked>
+                <label for="auto-scroll">启用自动滚动</label>
+            </div>
             <div class="button-group">
                 <button id="start-btn">开始收集数据</button>
                 <button id="stop-btn">停止收集</button>
@@ -347,13 +356,15 @@ function createFloatingPanel() {
         
         const timeLimit = parseInt(timeLimitInput.value);
         const postsLimit = parseInt(postsLimitInput.value);
+        const autoScrollEnabled = panel.querySelector('#auto-scroll').checked;
         
         try {
             const currentCount = startCollection({
                 timeLimit: timeLimit * 60 * 1000,
-                postsLimit: postsLimit
+                postsLimit: postsLimit,
+                autoScroll: autoScrollEnabled
             });
-            updateStatus(`开始收集数据，当前已有 ${currentCount || 0} 条数据`);
+            updateStatus(`开始收集数据，当前已有 ${currentCount || 0} 条数据${autoScrollEnabled ? '' : '（手动滚动模式）'}`);
         } catch (error) {
             updateStatus('收集数据失败: ' + error.message, true);
             stopCollection();
