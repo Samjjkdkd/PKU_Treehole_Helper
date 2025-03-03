@@ -8,6 +8,18 @@ let checkInterval = null;
 let scrollInterval = null;
 let isScrolling = false;
 let endTime = null;
+let commentsData = []; // 存储评论数据
+
+// 评论自动滚动相关变量
+let commentsScrollInterval = null;
+let isCommentsScrolling = false;
+
+// 评论收集相关变量
+let isCollectingComments = false;
+let commentCollectionStartTime = 0;
+let commentCollectionTimer = null;
+let collectedCommentIds = new Set();
+let earliestCommentTime = null;
 
 // 自动滚动函数
 function autoScroll() {
@@ -283,7 +295,9 @@ function createFloatingPanel() {
     panel.id = 'pku-treehole-panel';
     
     panel.innerHTML = `
-        <div class="tab">收藏统计</div>
+        <div class="tab">
+            <img src="${chrome.runtime.getURL('icon/icon48.png')}" class="icon" alt="PKU TreeHole Helper">
+        </div>
         <div class="panel-content">
             <div class="instruction">
                 点击"开始收集数据"后，插件会自动滚动页面加载帖子，并收集排序展示收藏数据。
@@ -543,13 +557,757 @@ function createFloatingPanel() {
     }, 1000);
 }
 
-// 在原有代码后面添加初始化调用
+// 在原有代码后面添加新的函数
+function createCommentCollectorButton() {
+    // 检查当前是否在树洞详情页
+    const sidebarTitle = document.querySelector('.sidebar-title.sidebar-top');
+    if (!sidebarTitle) return;
+    
+    // 检查是否已经添加了按钮
+    if (sidebarTitle.querySelector('.comment-collector-btn')) return;
+    
+    // 创建按钮
+    const button = document.createElement('a');
+    button.className = 'comment-collector-btn no-underline mr10';
+    button.innerHTML = `<img src="${chrome.runtime.getURL('icon/icon48.png')}" alt="收集评论" style="width: 20px; height: 20px; vertical-align: middle;">`;
+    button.style.cursor = 'pointer';
+    button.title = '收集树洞评论';
+    
+    // 将按钮添加到标题栏
+    const titleActions = sidebarTitle.querySelector('div');
+    if (titleActions) {
+        titleActions.appendChild(button);
+    }
+    
+    // 添加点击事件
+    button.addEventListener('click', function() {
+        showCommentCollectorDialog();
+    });
+}
+
+// 创建评论收集对话框
+function showCommentCollectorDialog() {
+    // 检查是否已存在对话框
+    let dialog = document.getElementById('comment-collector-dialog');
+    if (dialog) {
+        // 使用flex而不是block来显示对话框，保持布局结构
+        dialog.style.display = 'flex';
+        return;
+    }
+    
+    // 创建对话框
+    dialog = document.createElement('div');
+    dialog.id = 'comment-collector-dialog';
+    dialog.style.position = 'fixed';
+    dialog.style.left = '50%';
+    dialog.style.top = '50%';
+    dialog.style.transform = 'translate(-50%, -50%)';
+    dialog.style.width = '400px';
+    dialog.style.height = '400px'; // 设置初始高度
+    dialog.style.padding = '0';
+    dialog.style.backgroundColor = 'white';
+    dialog.style.borderRadius = '8px';
+    dialog.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+    dialog.style.zIndex = '10000';
+    dialog.style.minWidth = '300px';
+    dialog.style.minHeight = '200px';
+    dialog.style.display = 'flex';
+    dialog.style.flexDirection = 'column';
+    dialog.style.overflow = 'hidden'; // 防止内容溢出
+    dialog.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", sans-serif';
+    
+    dialog.innerHTML = `
+        <div id="comment-dialog-header" style="display: flex; justify-content: space-between; align-items: center; background-color: #f5f5f5; padding: 10px 15px; border-radius: 8px 8px 0 0; cursor: move; user-select: none; flex-shrink: 0;">
+            <h3 style="margin: 0; font-size: 16px; color: #333;">收集树洞评论</h3>
+            <button id="close-comment-dialog" style="background: none; border: none; cursor: pointer; font-size: 18px; color: #666;">&times;</button>
+        </div>
+        <div style="padding: 15px; display: flex; flex-direction: column; flex-grow: 1; overflow: hidden;">
+            <div id="comment-collector-controls" style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <button id="toggle-collect-comments" class="action-button" style="background-color: #1a73e8; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; min-width: 100px;">开始收集</button>
+                    <div style="display: flex; align-items: center;">
+                        <input type="checkbox" id="auto-scroll-comments" style="margin-right: 5px;">
+                        <label for="auto-scroll-comments" style="cursor: pointer; font-size: 14px;">自动滚动</label>
+                    </div>
+                </div>
+                
+                <div id="comment-stats" style="display: none; background-color: #f5f5f5; border-radius: 4px; padding: 10px; font-size: 13px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>已收集评论：</span>
+                        <span id="comment-count">0</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                        <span>用时：</span>
+                        <span id="collection-time">0秒</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>最早评论时间：</span>
+                        <span id="earliest-comment-time">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="comment-collector-status" style="padding: 8px; background-color: #f0f8ff; border-radius: 4px; margin-bottom: 10px; font-size: 13px; flex-shrink: 0;">准备开始收集评论...</div>
+            
+            <div id="comments-container" style="flex-grow: 1; overflow-y: auto; min-height: 0; border: 1px solid #eee; border-radius: 4px; padding: 5px;"></div>
+        </div>
+        <div id="resize-handle" style="position: absolute; right: 0; bottom: 0; width: 15px; height: 15px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 0%, transparent 50%, #ccc 50%, #ccc 100%); border-radius: 0 0 8px 0;"></div>
+    `;
+    
+    document.body.appendChild(dialog);
+    
+    // 添加关闭按钮事件
+    document.getElementById('close-comment-dialog').addEventListener('click', function() {
+        // 停止自动滚动
+        stopCommentsAutoScroll();
+        // 停止收集评论（如果正在进行）
+        stopCollectComments();
+        // 只隐藏对话框，不改变其布局属性
+        dialog.style.display = 'none';
+    });
+    
+    // 添加收集评论按钮事件
+    document.getElementById('toggle-collect-comments').addEventListener('click', function() {
+        const button = document.getElementById('toggle-collect-comments');
+        if (button.textContent === '开始收集') {
+            startCollectComments();
+            button.textContent = '停止收集';
+            button.style.backgroundColor = '#e53935';
+            
+            // 显示统计区域
+            document.getElementById('comment-stats').style.display = 'block';
+        } else {
+            stopCollectComments();
+            button.textContent = '开始收集';
+            button.style.backgroundColor = '#1a73e8';
+        }
+    });
+    
+    // 添加自动滚动复选框事件
+    const autoScrollCheckbox = document.getElementById('auto-scroll-comments');
+    autoScrollCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            startCommentsAutoScroll();
+        } else {
+            stopCommentsAutoScroll();
+        }
+    });
+    
+    // 添加拖拽功能
+    const dialogHeader = document.getElementById('comment-dialog-header');
+    let isDragging = false;
+    let offsetX, offsetY;
+    
+    dialogHeader.addEventListener('mousedown', function(e) {
+        isDragging = true;
+        
+        // 获取鼠标在对话框中的位置
+        const dialogRect = dialog.getBoundingClientRect();
+        offsetX = e.clientX - dialogRect.left;
+        offsetY = e.clientY - dialogRect.top;
+        
+        // 取消transform，使用left和top定位
+        dialog.style.transform = 'none';
+        dialog.style.left = dialogRect.left + 'px';
+        dialog.style.top = dialogRect.top + 'px';
+        
+        // 设置样式
+        dialog.style.transition = 'none';
+        dialogHeader.style.cursor = 'grabbing';
+    });
+    
+    document.addEventListener('mousemove', function(e) {
+        if (!isDragging) return;
+        
+        // 计算新位置
+        const newLeft = e.clientX - offsetX;
+        const newTop = e.clientY - offsetY;
+        
+        // 应用新位置
+        dialog.style.left = newLeft + 'px';
+        dialog.style.top = newTop + 'px';
+    });
+    
+    document.addEventListener('mouseup', function() {
+        if (isDragging) {
+            isDragging = false;
+            dialogHeader.style.cursor = 'move';
+        }
+    });
+    
+    // 添加调整大小功能
+    const resizeHandle = document.getElementById('resize-handle');
+    let isResizing = false;
+    let originalWidth, originalHeight, originalX, originalY;
+    
+    resizeHandle.addEventListener('mousedown', function(e) {
+        isResizing = true;
+        e.preventDefault();
+        
+        // 获取对话框初始尺寸和鼠标位置
+        const dialogRect = dialog.getBoundingClientRect();
+        originalWidth = dialogRect.width;
+        originalHeight = dialogRect.height;
+        originalX = e.clientX;
+        originalY = e.clientY;
+        
+        // 确保对话框使用绝对定位
+        if (dialog.style.transform !== 'none') {
+            dialog.style.transform = 'none';
+            dialog.style.left = dialogRect.left + 'px';
+            dialog.style.top = dialogRect.top + 'px';
+        }
+    });
+    
+    document.addEventListener('mousemove', function(e) {
+        if (!isResizing) return;
+        
+        // 计算宽度和高度的变化
+        const deltaWidth = e.clientX - originalX;
+        const deltaHeight = e.clientY - originalY;
+        
+        // 应用新尺寸（考虑最小尺寸限制）
+        const newWidth = Math.max(300, originalWidth + deltaWidth);
+        const newHeight = Math.max(200, originalHeight + deltaHeight);
+        
+        dialog.style.width = newWidth + 'px';
+        dialog.style.height = newHeight + 'px';
+    });
+    
+    document.addEventListener('mouseup', function() {
+        if (isResizing) {
+            isResizing = false;
+        }
+    });
+}
+
+// 收集评论
+function collectComments() {
+    // 获取评论容器
+    const commentsContainer = document.querySelector(".sidebar-content");
+    if (!commentsContainer) {
+        updateCommentCollectorStatus("无法找到评论容器", true);
+        return;
+    }
+    
+    // 获取所有评论元素
+    const commentElements = commentsContainer.querySelectorAll(".box:not(.box-tip):not(.box33)");
+    if (!commentElements || commentElements.length === 0) {
+        updateCommentCollectorStatus("未找到评论", true);
+        return;
+    }
+    
+    updateCommentCollectorStatus(`找到 ${commentElements.length} 条评论，正在处理...`);
+    
+    // 收集评论数据
+    const comments = [];
+    const processedIds = new Set(); // 用于跟踪已处理的评论ID
+    
+    commentElements.forEach(element => {
+        // 提取评论ID
+        const idElement = element.querySelector(".box-id");
+        if (!idElement) return;
+        
+        const commentId = idElement.textContent.trim();
+        
+        // 跳过已处理的评论
+        if (processedIds.has(commentId)) return;
+        processedIds.add(commentId);
+        
+        // 提取评论数据
+        const commentData = extractCommentData(element);
+        if (commentData) {
+            comments.push(commentData);
+        }
+    });
+    
+    // 显示收集到的评论
+    const dialogCommentsContainer = document.getElementById("comments-container");
+    if (dialogCommentsContainer) {
+        // 清空之前的内容
+        if (!isCommentsScrolling) {
+            dialogCommentsContainer.innerHTML = "";
+        }
+        
+        // 显示评论
+        displayComments(comments, dialogCommentsContainer);
+        
+        // 更新状态
+        updateCommentCollectorStatus(`已收集 ${processedIds.size} 条评论`);
+    }
+}
+
+// 提取评论数据
+function extractCommentData(commentElement) {
+    try {
+        // 获取评论ID
+        const idElement = commentElement.querySelector('.box-id');
+        const id = idElement ? idElement.textContent.trim().replace('#', '') : '';
+        
+        // 获取说话内容和说话人
+        const contentElement = commentElement.querySelector('.box-content');
+        if (!contentElement) return null;
+        
+        let speaker = '洞主'; // 默认为洞主
+        let content = '';
+        
+        // 检查是否有引用
+        const quoteElement = contentElement.querySelector('.quote');
+        let quote = null;
+        
+        if (quoteElement) {
+            // 有引用的情况
+            
+            // 1. 提取引用内容
+            const quoteText = quoteElement.textContent.trim();
+            const firstSpaceIndex = quoteText.indexOf(' ');
+            
+            if (firstSpaceIndex > 0) {
+                const quotedPerson = quoteText.substring(0, firstSpaceIndex).trim();
+                const quotedContent = quoteText.substring(firstSpaceIndex).trim();
+                
+                quote = {
+                    person: quotedPerson,
+                    content: quotedContent
+                };
+            }
+            
+            // 2. 获取评论者（第一个带背景色的元素）
+            const speakerElements = contentElement.querySelectorAll('[style*="background-color"]');
+            if (speakerElements && speakerElements.length > 0) {
+                speaker = speakerElements[0].textContent.trim();
+            }
+            
+            // 3. 获取评论内容
+            // 获取所有文本行
+            const textLines = contentElement.innerText.split('\n');
+            // 最后一行通常是评论内容
+            if (textLines.length > 1) {
+                const lastLine = textLines[textLines.length - 1].trim();
+                if (lastLine) {
+                    content = lastLine.replace(/^.*?:\s*/, ''); // 移除冒号前的内容
+                }
+            }
+        } else {
+            // 没有引用的情况
+            
+            // 1. 获取评论者（通常是带背景色的元素）
+            const speakerElements = contentElement.querySelectorAll('[style*="background-color"]');
+            if (speakerElements && speakerElements.length > 0) {
+                speaker = speakerElements[0].textContent.trim();
+            }
+            
+            // 2. 获取评论内容（通常是没有引用时的文本内容）
+            content = contentElement.textContent.trim();
+            
+            // 3. 去除前缀 [xxx]
+            content = content.replace(/\[.*?\](\s*Re\s*)?/g, '').trim();
+        }
+        
+        // 获取发布时间
+        const headerElement = commentElement.querySelector('.box-header');
+        const timeMatch = headerElement ? headerElement.textContent.match(/(\d{2}-\d{2} \d{2}:\d{2})/) : null;
+        const publishTime = timeMatch ? timeMatch[1] : '';
+        
+        return {
+            id,
+            speaker,
+            content,
+            quote,
+            publishTime
+        };
+    } catch (error) {
+        console.error('[PKU TreeHole] 提取评论数据出错:', error);
+        return null;
+    }
+}
+
+// 显示评论数据
+function displayComments(comments, container) {
+    if (!container) return;
+    
+    if (!comments || comments.length === 0) {
+        container.innerHTML = '<div style="padding: 10px; text-align: center;">暂无评论数据</div>';
+        return;
+    }
+    
+    // 为不同发言人分配不同颜色
+    const speakerColors = {};
+    const predefinedColors = [
+        '#e3f2fd', // 浅蓝色
+        '#fff3e0', // 浅橙色
+        '#f3e5f5', // 浅紫色
+        '#e8eaf6', // 浅靛蓝色
+        '#fce4ec', // 浅粉色
+        '#fffde7', // 浅黄色
+        '#e0f7fa', // 浅青色
+        '#efebe9', // 浅棕色
+        '#f1f8e9'  // 浅柠檬色
+    ];
+    
+    // 收集所有发言人
+    const speakers = [...new Set(comments.map(comment => comment.speaker))];
+    
+    // 分配颜色，洞主使用固定颜色
+    speakers.forEach((speaker, index) => {
+        if (speaker === '洞主') {
+            speakerColors[speaker] = '#f5f5f5'; // 洞主使用浅灰色
+        } else {
+            speakerColors[speaker] = predefinedColors[index % predefinedColors.length];
+        }
+    });
+    
+    container.innerHTML = '';
+    comments.forEach(comment => {
+        const commentDiv = document.createElement('div');
+        commentDiv.style.padding = '10px';
+        commentDiv.style.borderBottom = '1px solid #eee';
+        commentDiv.style.marginBottom = '8px';
+        commentDiv.style.borderRadius = '4px';
+        commentDiv.style.backgroundColor = getColorForSpeaker(comment.speaker, speakerColors);
+        
+        let html = `
+            <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: bold;">${comment.speaker}</span>
+                <span style="color: #666; font-size: 12px;">${comment.publishTime}</span>
+            </div>
+        `;
+        
+        if (comment.quote) {
+            html += `
+                <div style="background-color: rgba(0,0,0,0.05); padding: 8px; border-left: 3px solid #ccc; margin-bottom: 8px; font-size: 12px; color: #666; border-radius: 3px;">
+                    ${comment.quote.person}：${comment.quote.content}
+                </div>
+            `;
+        }
+        
+        html += `<div style="line-height: 1.5;">${comment.content}</div>`;
+        
+        commentDiv.innerHTML = html;
+        container.appendChild(commentDiv);
+    });
+}
+
+// 辅助函数：为发言人获取颜色
+function getColorForSpeaker(speaker, colorMap) {
+    if (colorMap[speaker]) {
+        return colorMap[speaker];
+    }
+    
+    // 如果是洞主，使用灰色
+    if (speaker === '洞主') {
+        return '#f5f5f5';
+    }
+    
+    // 如果没有分配颜色，根据名字生成颜色
+    let hash = 0;
+    for (let i = 0; i < speaker.length; i++) {
+        hash = speaker.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    const color = `hsl(${hash % 360}, 70%, 95%)`;
+    colorMap[speaker] = color;
+    return color;
+}
+
+// 监听页面变化，动态添加评论收集按钮
+function observeSidebarChanges() {
+    const observer = new MutationObserver((mutations) => {
+        createCommentCollectorButton();
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+    
+    // 初始检查
+    createCommentCollectorButton();
+}
+
+// 添加样式
+function addCommentCollectorStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+        .comment-collector-btn:hover {
+            opacity: 0.8;
+        }
+        #start-collect-comments:hover {
+            background-color: #1557b0;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// 开始自动滚动评论页面
+function startCommentsAutoScroll() {
+    if (isCommentsScrolling) return;
+    
+    isCommentsScrolling = true;
+    
+    // 获取评论容器
+    const scrollContainer = document.querySelector(".sidebar-content");
+    if (!scrollContainer) {
+        console.error("[PKU TreeHole] 无法找到评论滚动容器");
+        isCommentsScrolling = false;
+        return;
+    }
+    
+    console.log("[PKU TreeHole] 开始自动滚动评论...");
+    
+    // 清除可能存在的上一个滚动计时器
+    if (commentsScrollInterval) {
+        clearInterval(commentsScrollInterval);
+    }
+    
+    // 如果没有开始收集，则自动开始
+    if (!isCollectingComments) {
+        const toggleButton = document.getElementById('toggle-collect-comments');
+        if (toggleButton && toggleButton.textContent === '开始收集') {
+            toggleButton.click();
+        }
+    }
+    
+    // 设置滚动间隔
+    commentsScrollInterval = setInterval(() => {
+        // 如果已经停止收集，也停止滚动
+        if (!isCollectingComments) {
+            stopCommentsAutoScroll();
+            return;
+        }
+        
+        // 滚动到页面底部以加载更多评论
+        scrollContainer.scrollBy({
+            top: 500,
+            behavior: 'smooth'
+        });
+        
+        // 更新评论收集状态
+        updateCommentCollectorStatus("正在自动滚动加载评论...");
+        
+        // 定期收集当前可见的评论
+        collectComments();
+        
+        // 检查是否已滚动到底部
+        if (isScrolledToBottom(scrollContainer)) {
+            // 等待一段时间，如果仍然在底部，可能已加载完所有评论
+            setTimeout(() => {
+                if (isScrolledToBottom(scrollContainer) && isCommentsScrolling) {
+                    collectComments(); // 最后再收集一次
+                    updateCommentCollectorStatus("已滚动到底部，可能已加载全部评论");
+                    stopCommentsAutoScroll();
+                }
+            }, 3000);
+        }
+    }, 1500);
+}
+
+// 停止自动滚动评论页面
+function stopCommentsAutoScroll() {
+    if (commentsScrollInterval) {
+        clearInterval(commentsScrollInterval);
+        commentsScrollInterval = null;
+    }
+    isCommentsScrolling = false;
+    
+    // 更新复选框状态
+    const autoScrollCheckbox = document.getElementById('auto-scroll-comments');
+    if (autoScrollCheckbox) {
+        autoScrollCheckbox.checked = false;
+    }
+    
+    console.log("[PKU TreeHole] 停止自动滚动评论");
+}
+
+// 检查是否已滚动到容器底部
+function isScrolledToBottom(element) {
+    // 当滚动位置 + 可视高度 >= 总滚动高度 - 5像素（容差）时，认为已滚动到底部
+    return element.scrollTop + element.clientHeight >= element.scrollHeight - 5;
+}
+
+// 更新评论收集器状态显示
+function updateCommentCollectorStatus(text, isError = false) {
+    const statusElement = document.getElementById('comment-collector-status');
+    if (statusElement) {
+        statusElement.textContent = text;
+        statusElement.style.color = isError ? '#e53935' : '#333';
+    }
+}
+
+// 开始收集评论
+function startCollectComments() {
+    if (isCollectingComments) return;
+    
+    // 重置变量
+    isCollectingComments = true;
+    commentCollectionStartTime = Date.now();
+    collectedCommentIds.clear();
+    earliestCommentTime = null;
+    
+    // 清空评论容器
+    const commentsContainer = document.getElementById('comments-container');
+    if (commentsContainer) {
+        commentsContainer.innerHTML = '';
+    }
+    
+    // 重置统计信息
+    updateCommentStats(0, 0, '-');
+    
+    // 开始收集
+    updateCommentCollectorStatus('开始收集评论...');
+    collectComments(true);
+    
+    // 设置计时器，定期更新用时
+    commentCollectionTimer = setInterval(() => {
+        const elapsedSeconds = Math.floor((Date.now() - commentCollectionStartTime) / 1000);
+        updateCollectionTime(elapsedSeconds);
+    }, 1000);
+}
+
+// 停止收集评论
+function stopCollectComments() {
+    if (!isCollectingComments) return;
+    
+    isCollectingComments = false;
+    
+    // 停止计时器
+    if (commentCollectionTimer) {
+        clearInterval(commentCollectionTimer);
+        commentCollectionTimer = null;
+    }
+    
+    updateCommentCollectorStatus(`收集完成，共 ${collectedCommentIds.size} 条评论`);
+}
+
+// 收集评论
+function collectComments(isInitialCollection = false) {
+    if (!isCollectingComments && !isInitialCollection) return;
+    
+    // 获取评论容器
+    const commentsContainer = document.querySelector(".sidebar-content");
+    if (!commentsContainer) {
+        updateCommentCollectorStatus("无法找到评论容器", true);
+        stopCollectComments();
+        return;
+    }
+    
+    // 获取所有评论元素
+    const commentElements = commentsContainer.querySelectorAll(".box:not(.box-tip):not(.box33)");
+    if (!commentElements || commentElements.length === 0) {
+        updateCommentCollectorStatus("未找到评论", true);
+        if (isInitialCollection) {
+            stopCollectComments();
+        }
+        return;
+    }
+    
+    // 收集评论数据
+    const newComments = [];
+    let newCommentsCount = 0;
+    
+    commentElements.forEach(element => {
+        // 提取评论ID
+        const idElement = element.querySelector(".box-id");
+        if (!idElement) return;
+        
+        const commentId = idElement.textContent.trim();
+        
+        // 跳过已处理的评论
+        if (collectedCommentIds.has(commentId)) return;
+        
+        // 获取发布时间
+        const headerElement = element.querySelector(".box-header");
+        let publishTime = null;
+        if (headerElement) {
+            const timeText = headerElement.textContent.match(/(\d{2}-\d{2} \d{2}:\d{2})/);
+            if (timeText && timeText[1]) {
+                publishTime = timeText[1];
+                
+                // 更新最早评论时间
+                if (!earliestCommentTime || publishTime < earliestCommentTime) {
+                    earliestCommentTime = publishTime;
+                }
+            }
+        }
+        
+        // 提取评论数据
+        const commentData = extractCommentData(element);
+        if (commentData) {
+            // 添加评论ID和发布时间
+            commentData.id = commentId;
+            commentData.publishTime = publishTime;
+            
+            newComments.push(commentData);
+            collectedCommentIds.add(commentId);
+            newCommentsCount++;
+        }
+    });
+    
+    // 显示收集到的评论
+    if (newCommentsCount > 0) {
+        const dialogCommentsContainer = document.getElementById("comments-container");
+        if (dialogCommentsContainer) {
+            displayComments(newComments, dialogCommentsContainer);
+            
+            // 更新统计信息
+            updateCommentStats(
+                collectedCommentIds.size,
+                Math.floor((Date.now() - commentCollectionStartTime) / 1000),
+                earliestCommentTime || '-'
+            );
+            
+            // 更新状态
+            updateCommentCollectorStatus(`已收集 ${collectedCommentIds.size} 条评论`);
+        }
+    }
+}
+
+// 更新评论统计信息
+function updateCommentStats(count, timeInSeconds, earliestTime) {
+    const countElement = document.getElementById('comment-count');
+    const timeElement = document.getElementById('collection-time');
+    const earliestTimeElement = document.getElementById('earliest-comment-time');
+    
+    if (countElement) countElement.textContent = count;
+    if (timeElement) timeElement.textContent = formatTime(timeInSeconds);
+    if (earliestTimeElement) earliestTimeElement.textContent = earliestTime;
+}
+
+// 更新收集用时
+function updateCollectionTime(timeInSeconds) {
+    const timeElement = document.getElementById('collection-time');
+    if (timeElement) {
+        timeElement.textContent = formatTime(timeInSeconds);
+    }
+}
+
+// 格式化时间
+function formatTime(seconds) {
+    if (seconds < 60) {
+        return `${seconds}秒`;
+    } else if (seconds < 3600) {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${minutes}分${remainingSeconds}秒`;
+    } else {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const remainingSeconds = seconds % 60;
+        return `${hours}时${minutes}分${remainingSeconds}秒`;
+    }
+}
+
+// 在页面加载完成后初始化
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         loadInitialData();
         createFloatingPanel();
+        observeSidebarChanges();
+        addCommentCollectorStyles();
     });
 } else {
     loadInitialData();
     createFloatingPanel();
+    observeSidebarChanges();
+    addCommentCollectorStyles();
 } 

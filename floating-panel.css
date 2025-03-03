@@ -22,22 +22,46 @@
     top: 50%;
     transform: translateY(-50%);
     width: 30px;
-    height: 60px;
-    background: #4CAF50;
+    height: 70px;
+    background: #333333;
     border-radius: 4px 0 0 4px;
     cursor: pointer;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     color: white;
+    user-select: none;
+    padding: 8px 0;
+}
+
+#pku-treehole-panel .tab::before {
+    content: "<";
+    font-size: 16px;
+    margin-bottom: 6px;
+    transition: transform 0.3s ease;
+}
+
+#pku-treehole-panel.expanded .tab::before {
+    content: ">";
+}
+
+#pku-treehole-panel .tab .icon {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+}
+
+#pku-treehole-panel .tab .text {
     writing-mode: vertical-rl;
     text-orientation: mixed;
-    font-size: 14px;
-    user-select: none;
+    white-space: nowrap;
+    letter-spacing: 1px;
+    line-height: 1.2;
 }
 
 #pku-treehole-panel .tab:hover {
-    background: #45a049;
+    background: #222222;
 }
 
 #pku-treehole-panel .panel-content {
@@ -81,8 +105,8 @@
 .config-item input[type="number"]:focus,
 .config-item input[type="datetime-local"]:focus {
     outline: none;
-    border-color: #4CAF50;
-    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+    border-color: #1a73e8;
+    box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
 }
 
 .auto-scroll-option {
@@ -128,17 +152,17 @@
 }
 
 .sort-option select:hover {
-    border-color: #4CAF50;
+    border-color: #1a73e8;
 }
 
 .sort-option select:focus {
     outline: none;
-    border-color: #4CAF50;
-    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+    border-color: #1a73e8;
+    box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
 }
 
 .button-group button {
-    background-color: #4CAF50;
+    background-color: #1a73e8;
     color: white;
     padding: 8px 16px;
     border: none;
@@ -153,11 +177,11 @@
 }
 
 .button-group button#start-btn {
-    background-color: #4CAF50;
+    background-color: #1a73e8;
 }
 
 .button-group button#start-btn:hover {
-    background-color: #45a049;
+    background-color: #1557b0;
 }
 
 .button-group button#stop-btn {
@@ -203,13 +227,13 @@
 
 .hole-item:hover {
     background-color: #f5f5f5;
-    border-color: #4CAF50;
+    border-color: #1a73e8;
     transform: translateX(-2px);
 }
 
 .hole-item:active {
     transform: translateX(0);
-    background-color: #e8f5e9;
+    background-color: #e8f0fe;
 }
 
 .hole-id {
@@ -249,7 +273,7 @@
 .status {
     margin-top: 10px;
     padding: 5px;
-    background: #e8f5e9;
+    background: #e8f0fe;
     border-radius: 4px;
     display: none;
 }

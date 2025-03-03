@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "PKU TreeHole Likes Counter",
+  "name": "PKU TreeHole Helper",
   "version": "1.0",
-  "description": "显示北大树洞帖子的收藏数据",
+  "description": "帮助北大树洞用户更方便地使用树洞，支持自动滚动、收藏统计、图片分享，内容总结等功能",
   "permissions": [
     "activeTab",
     "scripting",
@@ -18,6 +18,10 @@
       "js": ["content.js"]
     }
   ],
+  "web_accessible_resources": [{
+    "resources": ["icon/icon48.png"],
+    "matches": ["https://treehole.pku.edu.cn/*"]
+  }],
   "icons": {
     "48": "icon/icon48.png",
     "128": "icon/icon128.png"
