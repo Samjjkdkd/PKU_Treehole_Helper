@@ -7,6 +7,7 @@ let startTime = null;
 let checkInterval = null;
 let scrollInterval = null;
 let isScrolling = false;
+let endTime = null;
 
 // 自动滚动函数
 function autoScroll() {
@@ -63,6 +64,7 @@ function autoScroll() {
 function processHoles() {
     const holes = document.querySelectorAll('.flow-item-row');
     let newHolesCount = 0;
+    let reachedTimeLimit = false;
     
     holes.forEach(hole => {
         if (hole.dataset.processed) return;
@@ -72,10 +74,10 @@ function processHoles() {
         const idElement = hole.querySelector('.box-id');
         const contentElement = hole.querySelector('.box-content');
         const headerElement = hole.querySelector('.box-header');
+        const hasImage = hole.querySelector('.box-content img') !== null;
         
         if (likeNum && idElement && contentElement && headerElement) {
             const count = parseInt(likeNum.textContent.trim());
-            // 安全地获取评论数，如果元素不存在则默认为0
             const replies = replyElement ? parseInt(replyElement.parentElement.textContent.trim()) : 0;
             const id = idElement.textContent.trim().replace('#', '').trim();
             const content = contentElement.textContent.trim();
@@ -85,13 +87,25 @@ function processHoles() {
             const timeMatch = headerText.match(/\d{2}-\d{2} \d{2}:\d{2}/);
             const publishTime = timeMatch ? timeMatch[0] : '';
             
+            // 检查是否达到时间限制
+            if (timeLimit && publishTime) {
+                const currentYear = new Date().getFullYear();
+                const postTime = new Date(currentYear + '-' + publishTime.replace(' ', ' '));
+                if (endTime && postTime <= endTime) {
+                    reachedTimeLimit = true;
+                    stopCollection();
+                    return;
+                }
+            }
+            
             // 存储数据
             const holeData = {
                 id: id,
                 content: content,
                 likeCount: count,
                 replyCount: replies,
-                publishTime: publishTime
+                publishTime: publishTime,
+                hasImage: hasImage
             };
             
             // 检查是否已存在该帖子
@@ -117,7 +131,7 @@ function processHoles() {
         const timeExpired = timeLimit && (currentTime - startTime > timeLimit);
         const reachedLimit = postsLimit && holesData.length >= postsLimit;
         
-        if (timeExpired || reachedLimit) {
+        if (timeExpired || reachedLimit || reachedTimeLimit) {
             stopCollection();
         }
     }
@@ -215,6 +229,12 @@ function stopCollection() {
 function clearHolesData() {
     console.log("[PKU TreeHole] 清空所有数据");
     holesData = [];
+    
+    // 清除所有帖子的processed标记
+    const holes = document.querySelectorAll('.flow-item-row');
+    holes.forEach(hole => {
+        delete hole.dataset.processed;
+    });
 }
 
 // 监听来自popup的消息
@@ -276,6 +296,11 @@ function createFloatingPanel() {
                 <div class="config-item">
                     <label>最大帖子数量:</label>
                     <input type="number" id="posts-limit" value="3000" min="10" max="10000">
+                </div>
+                <div class="config-item">
+                    <label>最早发布时间:</label>
+                    <input type="datetime-local" id="end-time" step="60">
+                    <button id="clear-time" class="small-btn">清除</button>
                 </div>
             </div>
             <div class="auto-scroll-option">
@@ -365,7 +390,6 @@ function createFloatingPanel() {
                 break;
             case 'time':
                 sortedHoles.sort((a, b) => {
-                    // 将时间字符串转换为可比较的格式
                     const timeA = a.publishTime.split(' ').reverse().join(' ');
                     const timeB = b.publishTime.split(' ').reverse().join(' ');
                     return timeB.localeCompare(timeA);
@@ -382,6 +406,7 @@ function createFloatingPanel() {
                     <span class="like-count">收藏数：${hole.likeCount}</span>
                     <span class="reply-count">评论数：${hole.replyCount}</span>
                     <span class="publish-time">${hole.publishTime}</span>
+                    ${hole.hasImage ? '<span class="has-image"><i class="icon-image"></i>含图片</span>' : ''}
                 </div>
                 <div class="content">${hole.content}</div>
             `;
@@ -417,6 +442,23 @@ function createFloatingPanel() {
         });
     }
 
+    // 设置时间输入框的默认值和清除按钮
+    const endTimeInput = panel.querySelector('#end-time');
+    const clearTimeBtn = panel.querySelector('#clear-time');
+    
+    // 设置默认时间为24小时前
+    const defaultTime = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const year = defaultTime.getFullYear();
+    const month = String(defaultTime.getMonth() + 1).padStart(2, '0');
+    const day = String(defaultTime.getDate()).padStart(2, '0');
+    const hours = String(defaultTime.getHours()).padStart(2, '0');
+    const minutes = String(defaultTime.getMinutes()).padStart(2, '0');
+    endTimeInput.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+    
+    clearTimeBtn.addEventListener('click', () => {
+        endTimeInput.value = '';
+    });
+
     startBtn.addEventListener('click', function() {
         startBtn.style.display = 'none';
         stopBtn.style.display = 'inline-block';
@@ -425,12 +467,39 @@ function createFloatingPanel() {
         const timeLimit = parseInt(timeLimitInput.value);
         const postsLimit = parseInt(postsLimitInput.value);
         const autoScrollEnabled = panel.querySelector('#auto-scroll').checked;
+        const endTimeStr = endTimeInput.value;
+        
+        // 验证结束时间
+        if (endTimeStr) {
+            const endTime = new Date(endTimeStr);
+            // 获取当前页面最早的帖子时间
+            const earliestPost = document.querySelector('.flow-item-row');
+            if (earliestPost) {
+                const headerElement = earliestPost.querySelector('.box-header');
+                if (headerElement) {
+                    const timeMatch = headerElement.textContent.match(/(\d{2}-\d{2} \d{2}:\d{2})/);
+                    if (timeMatch) {
+                        const currentYear = new Date().getFullYear();
+                        const postTime = new Date(currentYear + '-' + timeMatch[1].replace(' ', ' '));
+                        
+                        if (endTime > postTime) {
+                            updateStatus('错误：设定的截止时间晚于当前可见帖子的发布时间', true);
+                            startBtn.style.display = 'inline-block';
+                            stopBtn.style.display = 'none';
+                            loadingDiv.style.display = 'none';
+                            return;
+                        }
+                    }
+                }
+            }
+        }
         
         try {
             const currentCount = startCollection({
                 timeLimit: timeLimit * 60 * 1000,
                 postsLimit: postsLimit,
-                autoScroll: autoScrollEnabled
+                autoScroll: autoScrollEnabled,
+                endTime: endTimeStr ? new Date(endTimeStr) : null
             });
             updateStatus(`开始收集数据，当前已有 ${currentCount || 0} 条数据${autoScrollEnabled ? '' : '（手动滚动模式）'}`);
         } catch (error) {
@@ -444,7 +513,10 @@ function createFloatingPanel() {
         startBtn.style.display = 'inline-block';
         stopBtn.style.display = 'none';
         loadingDiv.style.display = 'none';
-        updateStatus(`收集完成，共 ${holesData.length} 条数据`);
+        
+        // 获取最后一条帖子的发布时间
+        const lastTime = holesData.length > 0 ? holesData[holesData.length - 1].publishTime : '';
+        updateStatus(`收集完成，共 ${holesData.length} 条数据${lastTime ? '，最后帖子发布于 ' + lastTime : ''}`);
         displayHoles(holesData);
     });
 
@@ -464,7 +536,9 @@ function createFloatingPanel() {
         if (isCollecting) {
             displayHoles(holesData);
             const elapsedTime = (Date.now() - startTime) / 1000;
-            updateStatus(`已收集 ${holesData.length} 条数据，用时 ${elapsedTime.toFixed(0)} 秒`);
+            // 获取最后一条帖子的发布时间
+            const lastTime = holesData.length > 0 ? holesData[holesData.length - 1].publishTime : '';
+            updateStatus(`已收集 ${holesData.length} 条数据，用时 ${elapsedTime.toFixed(0)} 秒${lastTime ? '，最后帖子发布于 ' + lastTime : ''}`);
         }
     }, 1000);
 }
