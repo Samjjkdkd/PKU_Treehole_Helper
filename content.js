@@ -9,6 +9,8 @@ let scrollInterval = null;
 let isScrolling = false;
 let endTime = null;
 let commentsData = []; // 存储评论数据
+let allCommentsData = []; // 存储所有收集到的评论数据
+let speakerList = new Set(); // 存储所有发言人列表
 
 // 评论自动滚动相关变量
 let commentsScrollInterval = null;
@@ -621,8 +623,8 @@ function showCommentCollectorDialog() {
             <h3 style="margin: 0; font-size: 16px; color: #333;">收集树洞评论</h3>
             <button id="close-comment-dialog" style="background: none; border: none; cursor: pointer; font-size: 18px; color: #666;">&times;</button>
         </div>
-        <div style="padding: 15px; display: flex; flex-direction: column; flex-grow: 1; overflow: hidden;">
-            <div id="comment-collector-controls" style="margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;">
+        <div id="comment-dialog-content" style="padding: 15px; flex-grow: 1; overflow-y: auto;">
+            <div id="comment-collector-controls" style="margin-bottom: 15px;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <button id="toggle-collect-comments" class="action-button" style="background-color: #1a73e8; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; min-width: 100px;">开始收集</button>
                     <div style="display: flex; align-items: center;">
@@ -631,7 +633,7 @@ function showCommentCollectorDialog() {
                     </div>
                 </div>
                 
-                <div id="comment-stats" style="display: none; background-color: #f5f5f5; border-radius: 4px; padding: 10px; font-size: 13px;">
+                <div id="comment-stats" style="display: none; background-color: #f5f5f5; border-radius: 4px; padding: 10px; font-size: 13px; margin-top: 10px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                         <span>已收集评论：</span>
                         <span id="comment-count">0</span>
@@ -645,11 +647,22 @@ function showCommentCollectorDialog() {
                         <span id="earliest-comment-time">-</span>
                     </div>
                 </div>
+                
+                <div id="comment-filter" style="display: none; margin-top: 10px;">
+                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                        <label for="speaker-filter" style="margin-right: 8px; font-size: 13px;">只看：</label>
+                        <select id="speaker-filter" style="flex-grow: 1; padding: 5px; border-radius: 4px; border: 1px solid #ddd; font-size: 13px;">
+                            <option value="">全部评论</option>
+                        </select>
+                    </div>
+                </div>
             </div>
             
-            <div id="comment-collector-status" style="padding: 8px; background-color: #f0f8ff; border-radius: 4px; margin-bottom: 10px; font-size: 13px; flex-shrink: 0;">准备开始收集评论...</div>
+            <div id="comment-collector-status" style="padding: 8px; background-color: #f0f8ff; border-radius: 4px; margin-bottom: 15px; font-size: 13px;">准备开始收集评论...</div>
             
-            <div id="comments-container" style="flex-grow: 1; overflow-y: auto; min-height: 0; border: 1px solid #eee; border-radius: 4px; padding: 5px;"></div>
+            <div id="comments-container" style="border: 1px solid #eee; border-radius: 4px; padding: 5px;">
+                <div style="padding: 10px; text-align: center; color: #666;">暂无评论数据</div>
+            </div>
         </div>
         <div id="resize-handle" style="position: absolute; right: 0; bottom: 0; width: 15px; height: 15px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 0%, transparent 50%, #ccc 50%, #ccc 100%); border-radius: 0 0 8px 0;"></div>
     `;
@@ -659,7 +672,7 @@ function showCommentCollectorDialog() {
     // 添加关闭按钮事件
     document.getElementById('close-comment-dialog').addEventListener('click', function() {
         // 停止自动滚动
-        stopCommentsAutoScroll();
+        stopCommentsAutoScroll(false);
         // 停止收集评论（如果正在进行）
         stopCollectComments();
         // 只隐藏对话框，不改变其布局属性
@@ -686,12 +699,15 @@ function showCommentCollectorDialog() {
     // 添加自动滚动复选框事件
     const autoScrollCheckbox = document.getElementById('auto-scroll-comments');
     autoScrollCheckbox.addEventListener('change', function() {
-        if (this.checked) {
-            startCommentsAutoScroll();
-        } else {
-            stopCommentsAutoScroll();
-        }
+        // 改为仅设置状态，不触发滚动
+        console.log("[PKU TreeHole] 自动滚动设置: " + (this.checked ? "开启" : "关闭"));
     });
+    
+    // 添加筛选下拉框事件（初始状态下隐藏）
+    const speakerFilter = document.getElementById('speaker-filter');
+    if (speakerFilter) {
+        speakerFilter.addEventListener('change', filterAndDisplayComments);
+    }
     
     // 添加拖拽功能
     const dialogHeader = document.getElementById('comment-dialog-header');
@@ -957,7 +973,6 @@ function displayComments(comments, container) {
         }
     });
     
-    container.innerHTML = '';
     comments.forEach(comment => {
         const commentDiv = document.createElement('div');
         commentDiv.style.padding = '10px';
@@ -1060,19 +1075,15 @@ function startCommentsAutoScroll() {
         clearInterval(commentsScrollInterval);
     }
     
-    // 如果没有开始收集，则自动开始
-    if (!isCollectingComments) {
-        const toggleButton = document.getElementById('toggle-collect-comments');
-        if (toggleButton && toggleButton.textContent === '开始收集') {
-            toggleButton.click();
-        }
-    }
+    // 记录上次评论数量，用于检测是否还在加载新评论
+    let lastCommentCount = 0;
+    let stableCount = 0;
     
     // 设置滚动间隔
     commentsScrollInterval = setInterval(() => {
-        // 如果已经停止收集，也停止滚动
+        // 如果已不再收集评论，停止滚动
         if (!isCollectingComments) {
-            stopCommentsAutoScroll();
+            stopCommentsAutoScroll(false);
             return;
         }
         
@@ -1085,35 +1096,54 @@ function startCommentsAutoScroll() {
         // 更新评论收集状态
         updateCommentCollectorStatus("正在自动滚动加载评论...");
         
-        // 定期收集当前可见的评论
+        // 收集当前可见的评论
         collectComments();
         
-        // 检查是否已滚动到底部
-        if (isScrolledToBottom(scrollContainer)) {
-            // 等待一段时间，如果仍然在底部，可能已加载完所有评论
-            setTimeout(() => {
-                if (isScrolledToBottom(scrollContainer) && isCommentsScrolling) {
+        // 检查是否已加载完全部评论（到达底部且评论数量不再增加）
+        const currentCommentCount = collectedCommentIds.size;
+        const isAtBottom = isScrolledToBottom(scrollContainer);
+        
+        if (isAtBottom) {
+            // 如果评论数量与上次相同，累加稳定计数
+            if (currentCommentCount === lastCommentCount) {
+                stableCount++;
+                
+                // 如果连续3次检测到评论数量不变且在底部，认为已收集完成
+                if (stableCount >= 3) {
                     collectComments(); // 最后再收集一次
-                    updateCommentCollectorStatus("已滚动到底部，可能已加载全部评论");
-                    stopCommentsAutoScroll();
+                    updateCommentCollectorStatus("已滚动到底部，评论加载完成，停止收集");
+                    stopCollectComments(); // 停止收集评论（也会停止滚动）
+                    return;
                 }
-            }, 3000);
+            } else {
+                // 评论数量有变化，重置稳定计数
+                stableCount = 0;
+            }
+        } else {
+            // 不在底部，重置稳定计数
+            stableCount = 0;
         }
+        
+        // 更新上次评论数量
+        lastCommentCount = currentCommentCount;
+        
     }, 1500);
 }
 
 // 停止自动滚动评论页面
-function stopCommentsAutoScroll() {
+function stopCommentsAutoScroll(updateCheckbox = true) {
     if (commentsScrollInterval) {
         clearInterval(commentsScrollInterval);
         commentsScrollInterval = null;
     }
     isCommentsScrolling = false;
     
-    // 更新复选框状态
-    const autoScrollCheckbox = document.getElementById('auto-scroll-comments');
-    if (autoScrollCheckbox) {
-        autoScrollCheckbox.checked = false;
+    // 根据参数决定是否更新复选框状态
+    if (updateCheckbox) {
+        const autoScrollCheckbox = document.getElementById('auto-scroll-comments');
+        if (autoScrollCheckbox) {
+            autoScrollCheckbox.checked = false;
+        }
     }
     
     console.log("[PKU TreeHole] 停止自动滚动评论");
@@ -1143,11 +1173,19 @@ function startCollectComments() {
     commentCollectionStartTime = Date.now();
     collectedCommentIds.clear();
     earliestCommentTime = null;
+    allCommentsData = []; // 清空所有评论数据
+    speakerList.clear(); // 清空发言人列表
     
     // 清空评论容器
     const commentsContainer = document.getElementById('comments-container');
     if (commentsContainer) {
         commentsContainer.innerHTML = '';
+    }
+    
+    // 隐藏筛选控件（收集过程中不显示）
+    const commentFilter = document.getElementById('comment-filter');
+    if (commentFilter) {
+        commentFilter.style.display = 'none';
     }
     
     // 重置统计信息
@@ -1162,6 +1200,12 @@ function startCollectComments() {
         const elapsedSeconds = Math.floor((Date.now() - commentCollectionStartTime) / 1000);
         updateCollectionTime(elapsedSeconds);
     }, 1000);
+    
+    // 如果自动滚动选项已勾选，则开始自动滚动
+    const autoScrollCheckbox = document.getElementById('auto-scroll-comments');
+    if (autoScrollCheckbox && autoScrollCheckbox.checked) {
+        startCommentsAutoScroll();
+    }
 }
 
 // 停止收集评论
@@ -1174,6 +1218,34 @@ function stopCollectComments() {
     if (commentCollectionTimer) {
         clearInterval(commentCollectionTimer);
         commentCollectionTimer = null;
+    }
+    
+    // 停止自动滚动（但不取消复选框勾选）
+    stopCommentsAutoScroll(false);
+    
+    // 更新UI按钮状态
+    const toggleButton = document.getElementById('toggle-collect-comments');
+    if (toggleButton) {
+        toggleButton.textContent = '开始收集';
+        toggleButton.style.backgroundColor = '#1a73e8';
+    }
+    
+    // 显示筛选控件
+    const commentFilter = document.getElementById('comment-filter');
+    if (commentFilter) {
+        commentFilter.style.display = 'block';
+    }
+    
+    // 更新筛选下拉框
+    updateSpeakerFilter();
+    
+    // 添加筛选下拉框的事件监听
+    const speakerFilter = document.getElementById('speaker-filter');
+    if (speakerFilter) {
+        // 先移除可能存在的旧监听器
+        speakerFilter.removeEventListener('change', filterAndDisplayComments);
+        // 添加新的监听器
+        speakerFilter.addEventListener('change', filterAndDisplayComments);
     }
     
     updateCommentCollectorStatus(`收集完成，共 ${collectedCommentIds.size} 条评论`);
@@ -1237,9 +1309,18 @@ function collectComments(isInitialCollection = false) {
             commentData.id = commentId;
             commentData.publishTime = publishTime;
             
+            // 添加到新评论列表
             newComments.push(commentData);
             collectedCommentIds.add(commentId);
             newCommentsCount++;
+            
+            // 将发言人添加到列表中
+            if (commentData.speaker) {
+                speakerList.add(commentData.speaker);
+            }
+            
+            // 添加到全部评论数据中
+            allCommentsData.push(commentData);
         }
     });
     
@@ -1247,7 +1328,9 @@ function collectComments(isInitialCollection = false) {
     if (newCommentsCount > 0) {
         const dialogCommentsContainer = document.getElementById("comments-container");
         if (dialogCommentsContainer) {
-            displayComments(newComments, dialogCommentsContainer);
+            // 清空现有评论并显示全部
+            dialogCommentsContainer.innerHTML = '';
+            displayComments(allCommentsData, dialogCommentsContainer);
             
             // 更新统计信息
             updateCommentStats(
@@ -1294,6 +1377,65 @@ function formatTime(seconds) {
         const minutes = Math.floor((seconds % 3600) / 60);
         const remainingSeconds = seconds % 60;
         return `${hours}时${minutes}分${remainingSeconds}秒`;
+    }
+}
+
+// 更新评论筛选下拉框
+function updateSpeakerFilter() {
+    const speakerFilter = document.getElementById('speaker-filter');
+    if (!speakerFilter) return;
+    
+    // 保存当前选择
+    const currentSelection = speakerFilter.value;
+    
+    // 清空现有选项，只保留"全部评论"
+    while (speakerFilter.options.length > 1) {
+        speakerFilter.remove(1);
+    }
+    
+    // 添加所有发言人作为选项
+    speakerList.forEach(speaker => {
+        const option = document.createElement('option');
+        option.value = speaker;
+        option.textContent = speaker;
+        speakerFilter.appendChild(option);
+    });
+    
+    // 恢复之前的选择（如果存在于新列表中）
+    if (currentSelection && speakerList.has(currentSelection)) {
+        speakerFilter.value = currentSelection;
+    }
+}
+
+// 筛选并显示评论
+function filterAndDisplayComments() {
+    const speakerFilter = document.getElementById('speaker-filter');
+    const selectedSpeaker = speakerFilter ? speakerFilter.value : '';
+    const commentsContainer = document.getElementById('comments-container');
+    
+    if (!commentsContainer) return;
+    
+    // 筛选评论
+    let filteredComments = allCommentsData;
+    if (selectedSpeaker) {
+        filteredComments = allCommentsData.filter(comment => comment.speaker === selectedSpeaker);
+    }
+    
+    // 显示筛选后的评论
+    commentsContainer.innerHTML = ''; // 清空容器
+    
+    if (filteredComments.length === 0) {
+        commentsContainer.innerHTML = '<div style="padding: 10px; text-align: center; color: #666;">没有找到符合条件的评论</div>';
+        return;
+    }
+    
+    displayComments(filteredComments, commentsContainer);
+    
+    // 更新状态信息
+    if (selectedSpeaker) {
+        updateCommentCollectorStatus(`显示 ${selectedSpeaker} 的 ${filteredComments.length} 条评论（共收集 ${allCommentsData.length} 条）`);
+    } else {
+        updateCommentCollectorStatus(`显示全部 ${allCommentsData.length} 条评论`);
     }
 }
 
