@@ -656,6 +656,16 @@ function showCommentCollectorDialog() {
                         </select>
                     </div>
                 </div>
+                
+                <div id="export-controls" style="display: none; margin-top: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 13px;">导出评论：</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button id="export-text" style="background-color: #4CAF50; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 13px;">文本格式</button>
+                            <button id="export-image" style="background-color: #2196F3; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 13px;">图片格式</button>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <div id="comment-collector-status" style="padding: 8px; background-color: #f0f8ff; border-radius: 4px; margin-bottom: 15px; font-size: 13px;">准备开始收集评论...</div>
@@ -707,6 +717,17 @@ function showCommentCollectorDialog() {
     const speakerFilter = document.getElementById('speaker-filter');
     if (speakerFilter) {
         speakerFilter.addEventListener('change', filterAndDisplayComments);
+    }
+    
+    // 添加导出按钮事件监听器
+    const exportTextButton = document.getElementById('export-text');
+    if (exportTextButton) {
+        exportTextButton.addEventListener('click', exportAsText);
+    }
+    
+    const exportImageButton = document.getElementById('export-image');
+    if (exportImageButton) {
+        exportImageButton.addEventListener('click', exportAsImage);
     }
     
     // 添加拖拽功能
@@ -1089,7 +1110,7 @@ function startCommentsAutoScroll() {
         
         // 滚动到页面底部以加载更多评论
         scrollContainer.scrollBy({
-            top: 500,
+            top: 3000,
             behavior: 'smooth'
         });
         
@@ -1188,6 +1209,12 @@ function startCollectComments() {
         commentFilter.style.display = 'none';
     }
     
+    // 隐藏导出控件（收集过程中不显示）
+    const exportControls = document.getElementById('export-controls');
+    if (exportControls) {
+        exportControls.style.display = 'none';
+    }
+    
     // 重置统计信息
     updateCommentStats(0, 0, '-');
     
@@ -1234,6 +1261,12 @@ function stopCollectComments() {
     const commentFilter = document.getElementById('comment-filter');
     if (commentFilter) {
         commentFilter.style.display = 'block';
+    }
+    
+    // 显示导出控件
+    const exportControls = document.getElementById('export-controls');
+    if (exportControls) {
+        exportControls.style.display = 'block';
     }
     
     // 更新筛选下拉框
@@ -1437,6 +1470,203 @@ function filterAndDisplayComments() {
     } else {
         updateCommentCollectorStatus(`显示全部 ${allCommentsData.length} 条评论`);
     }
+}
+
+// 导出为文本格式
+function exportAsText() {
+    // 获取当前显示的评论
+    const speakerFilter = document.getElementById('speaker-filter');
+    const selectedSpeaker = speakerFilter ? speakerFilter.value : '';
+    
+    // 筛选评论
+    let comments = allCommentsData;
+    if (selectedSpeaker) {
+        comments = allCommentsData.filter(comment => comment.speaker === selectedSpeaker);
+    }
+    
+    if (comments.length === 0) {
+        alert('没有可导出的评论');
+        return;
+    }
+    
+    // 生成帖子信息
+    const holeTitle = document.querySelector('.sidebar-title.sidebar-top');
+    const holeTitleMatch = holeTitle ? holeTitle.textContent.match(/#\d+/) : null;
+    const holeId = holeTitleMatch ? holeTitleMatch[0] : (holeTitle ? holeTitle.textContent.trim() : '未知帖子');
+    const totalComments = comments.length;
+    const exportTime = new Date().toLocaleString();
+    
+    // 生成文本内容
+    let textContent = `# ${holeId}\n`;
+    textContent += `# 导出时间：${exportTime}\n`;
+    textContent += `# 评论数量：${totalComments}\n`;
+    if (selectedSpeaker) {
+        textContent += `# 筛选条件：只看 ${selectedSpeaker}\n`;
+    }
+    textContent += `# 最早评论时间：${earliestCommentTime || '未知'}\n`;
+    textContent += `\n-------------------------------\n\n`;
+    
+    // 添加每条评论
+    comments.forEach((comment, index) => {
+        // 评论ID和发言人信息
+        textContent += `[${index + 1}] ID: ${comment.id || ''} | 发言人: ${comment.speaker || '匿名'}`;
+        
+        // 添加发布时间
+        if (comment.publishTime) {
+            textContent += ` | 时间: ${comment.publishTime}`;
+        }
+        textContent += `\n\n`;
+        
+        // 如果有引用内容，先显示引用
+        if (comment.quote) {
+            textContent += `【引用】${comment.quote.person || '匿名'}: ${comment.quote.content}\n\n`;
+        }
+        
+        // 添加评论主体内容
+        textContent += `${comment.content || ''}\n\n`;
+        
+        textContent += `-------------------------------\n\n`;
+    });
+    
+    // 创建下载链接
+    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    
+    // 设置文件名
+    const fileName = `TreeHole${holeId}_${new Date().getTime()}.txt`;
+    
+    // 创建并触发下载
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    
+    // 清理资源
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+    
+    updateCommentCollectorStatus(`已导出 ${totalComments} 条评论为文本文件`);
+}
+
+// 导出为图片格式
+function exportAsImage() {
+    // 获取评论容器
+    const commentsContainer = document.getElementById('comments-container');
+    if (!commentsContainer) {
+        alert('找不到评论容器');
+        return;
+    }
+    
+    // 检查是否有评论
+    if (commentsContainer.children.length === 0 || 
+        (commentsContainer.children.length === 1 && commentsContainer.children[0].textContent.includes('暂无评论数据'))) {
+        alert('没有可导出的评论');
+        return;
+    }
+    
+    // 获取帖子信息
+    const holeTitle = document.querySelector('.sidebar-title.sidebar-top');
+    const holeId = holeTitle ? holeTitle.textContent.trim() : '未知帖子';
+    const speakerFilter = document.getElementById('speaker-filter');
+    const selectedSpeaker = speakerFilter && speakerFilter.value ? speakerFilter.value : '全部';
+    
+    // 创建一个临时容器，用于生成图片
+    const tempContainer = document.createElement('div');
+    tempContainer.style.backgroundColor = 'white';
+    tempContainer.style.padding = '20px';
+    tempContainer.style.width = '800px';
+    tempContainer.style.fontFamily = 'Arial, sans-serif';
+    tempContainer.style.position = 'absolute';
+    tempContainer.style.left = '-9999px';
+    
+    // 添加标题和信息
+    const header = document.createElement('div');
+    header.style.marginBottom = '20px';
+    header.style.borderBottom = '2px solid #eee';
+    header.style.paddingBottom = '10px';
+    
+    header.innerHTML = `
+        <h2 style="margin: 0 0 10px 0;">${holeId} 评论导出</h2>
+        <div style="color: #666; font-size: 14px;">
+            <div>导出时间：${new Date().toLocaleString()}</div>
+            <div>评论数量：${allCommentsData.length} (显示: ${selectedSpeaker === '全部' ? '全部' : `只看 ${selectedSpeaker}`})</div>
+            <div>最早评论时间：${earliestCommentTime || '未知'}</div>
+        </div>
+    `;
+    
+    tempContainer.appendChild(header);
+    
+    // 复制评论内容
+    const contentClone = commentsContainer.cloneNode(true);
+    contentClone.style.border = 'none';
+    contentClone.style.maxWidth = '100%';
+    
+    tempContainer.appendChild(contentClone);
+    
+    // 添加到文档以便截图
+    document.body.appendChild(tempContainer);
+    
+    // 使用html2canvas截图
+    loadHtml2Canvas()
+        .then(() => {
+            return html2canvas(tempContainer, {
+                backgroundColor: '#ffffff',
+                scale: 2,
+                logging: false,
+                useCORS: true
+            });
+        })
+        .then(canvas => {
+            // 移除临时容器
+            document.body.removeChild(tempContainer);
+            
+            // 转换为图片URL
+            const imageUrl = canvas.toDataURL('image/png');
+            
+            // 设置文件名
+            const fileName = `PKU_TreeHole_Comments_${holeId.replace('#', '')}_${new Date().getTime()}.png`;
+            
+            // 创建并触发下载
+            const a = document.createElement('a');
+            a.href = imageUrl;
+            a.download = fileName;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            
+            // 清理资源
+            setTimeout(() => {
+                document.body.removeChild(a);
+            }, 100);
+            
+            updateCommentCollectorStatus(`已导出评论为图片`);
+        })
+        .catch(error => {
+            console.error('导出图片失败:', error);
+            alert('导出图片失败，请重试');
+        });
+}
+
+// 动态加载html2canvas库
+function loadHtml2Canvas() {
+    return new Promise((resolve, reject) => {
+        // 检查是否已加载
+        if (window.html2canvas) {
+            resolve();
+            return;
+        }
+        
+        // 加载脚本
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('无法加载html2canvas库'));
+        document.head.appendChild(script);
+    });
 }
 
 // 在页面加载完成后初始化
