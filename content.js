@@ -2106,6 +2106,14 @@ function exportAsImage() {
     header.style.borderBottom = '2px solid #eee';
     header.style.paddingBottom = '10px';
 
+    // 获取当前筛选后的评论数量
+    const filteredComments = document.querySelectorAll('#comments-container .collected-comment');
+    const totalFilteredComments = filteredComments.length - 1;
+    
+    // 设置最大显示条数限制
+    const MAX_COMMENTS_TO_DISPLAY = 101;
+    const displayCount = Math.min(totalFilteredComments, MAX_COMMENTS_TO_DISPLAY);
+
     header.innerHTML = `
         <h2 style="margin: 0 0 10px 0;">${holeId}</h2>
         <div style="color: #666; font-size: 14px;">
@@ -2117,10 +2125,29 @@ function exportAsImage() {
 
     tempContainer.appendChild(header);
 
-    // 复制评论内容
-    const contentClone = commentsContainer.cloneNode(true);
+    // 复制评论内容（仅复制有限数量的评论）
+    const contentClone = document.createElement('div');
     contentClone.style.border = 'none';
     contentClone.style.maxWidth = '100%';
+    
+    // 只复制前MAX_COMMENTS_TO_DISPLAY条评论
+    for (let i = 0; i < displayCount; i++) {
+        if (i < filteredComments.length) {
+            contentClone.appendChild(filteredComments[i].cloneNode(true));
+        }
+    }
+    
+    // 如果有更多评论但没有显示，添加提示信息
+    if (totalFilteredComments > MAX_COMMENTS_TO_DISPLAY) {
+        const moreInfo = document.createElement('div');
+        moreInfo.style.textAlign = 'center';
+        moreInfo.style.color = '#666';
+        moreInfo.style.padding = '15px';
+        moreInfo.style.marginTop = '10px';
+        moreInfo.style.borderTop = '1px dashed #ddd';
+        moreInfo.textContent = `注：图片中仅显示前${MAX_COMMENTS_TO_DISPLAY - 1}条评论，共有 ${totalFilteredComments} 条评论。请使用文本导出获取完整数据。`;
+        contentClone.appendChild(moreInfo);
+    }
 
     tempContainer.appendChild(contentClone);
 
