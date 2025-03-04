@@ -2108,7 +2108,7 @@ function exportAsImage() {
 
     // 获取当前筛选后的评论数量
     const filteredComments = document.querySelectorAll('#comments-container .collected-comment');
-    const totalFilteredComments = filteredComments.length - 1;
+    const totalFilteredComments = filteredComments.length;
     
     // 设置最大显示条数限制
     const MAX_COMMENTS_TO_DISPLAY = 101;
@@ -2145,7 +2145,7 @@ function exportAsImage() {
         moreInfo.style.padding = '15px';
         moreInfo.style.marginTop = '10px';
         moreInfo.style.borderTop = '1px dashed #ddd';
-        moreInfo.textContent = `注：图片中仅显示前${MAX_COMMENTS_TO_DISPLAY - 1}条评论，共有 ${totalFilteredComments} 条评论。请使用文本导出获取完整数据。`;
+        moreInfo.textContent = `注：图片中仅显示前${MAX_COMMENTS_TO_DISPLAY - 1}条评论，共有 ${totalFilteredComments - 1} 条评论。请使用文本导出获取完整数据。`;
         contentClone.appendChild(moreInfo);
     }
 
@@ -2187,7 +2187,8 @@ function exportAsImage() {
                 document.body.removeChild(a);
             }, 100);
 
-            updateCommentCollectorStatus(`已导出评论为图片`);
+            updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条帖子数据为图片文件
+                ${totalFilteredComments > MAX_COMMENTS_TO_DISPLAY ? '（仅展示前100条）' : ''}`);
         })
         .catch(error => {
             console.error('导出图片失败:', error);
