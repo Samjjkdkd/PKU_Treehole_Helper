@@ -27,25 +27,24 @@ function updateGlobalStatus(text, isError = false) {
 
 // 检查并应用主题颜色到tab
 function applyThemeToTab() {
-    // 获取页面的计算样式
-    const rootStyles = getComputedStyle(document.documentElement);
-    // 读取--theme_font_color变量，如果不存在则检查文本颜色
-    const fontColor = rootStyles.getPropertyValue('--theme_font_color').trim() || 
-                      getComputedStyle(document.body).color;
-    
-    // 如果fontColor是黑色或接近黑色（浅色主题），则应用浅色背景
-    if (fontColor === '#000' || fontColor === '#000000' || fontColor === 'rgb(0, 0, 0)') {
+
+    // 检查是否存在root-dark-mode类
+    const appElement = document.getElementById('app');
+    const hasRootDarkMode = appElement && appElement.classList.contains('root-dark-mode');
+
+    // 如果找到root-dark-mode类，直接应用深色主题
+    if (hasRootDarkMode) {
+        if (tabElement) {
+            tabElement.style.backgroundColor = '#333333'; // 深灰色背景
+            tabElement.style.color = 'white'; // 白色文本
+            tabElement.dataset.theme = 'dark'; // 设置数据属性表示当前是深色主题
+        }
+        return; // 已经应用了主题，直接返回
+    } else {
         if (tabElement) {
             tabElement.style.backgroundColor = '#f0f0f0'; // 浅灰色背景
             tabElement.style.color = '#333'; // 深色文本，提高对比度
             tabElement.dataset.theme = 'light'; // 设置数据属性表示当前是浅色主题
-        }
-    } else {
-        // 恢复默认的深色背景
-        if (tabElement) {
-            tabElement.style.backgroundColor = '#333333'; // 恢复默认深灰色背景
-            tabElement.style.color = 'white'; // 恢复默认白色文本
-            tabElement.dataset.theme = 'dark'; // 设置数据属性表示当前是深色主题
         }
     }
 }
@@ -64,9 +63,9 @@ let earliestCommentTime = null;
 // 自动滚动函数
 function autoScroll() {
     if (isScrolling) return;
-    
+
     isScrolling = true;
-    
+
     // 使用用户提供的滚动容器
     const scrollContainer = document.querySelector(".left-container");
     if (!scrollContainer) {
@@ -74,34 +73,34 @@ function autoScroll() {
         isScrolling = false;
         return;
     }
-    
+
     console.log("[PKU TreeHole] 开始自动滚动...");
-    
+
     let scrollCount = 0;
     const maxScrolls = 200; // 防止无限滚动
-    
+
     // 清除可能存在的上一个滚动计时器
     if (scrollInterval) {
         clearInterval(scrollInterval);
     }
-    
+
     scrollInterval = setInterval(() => {
         // 滚动页面
         scrollContainer.scrollBy(0, 5000);
         scrollCount++;
-        
+
         // 检查是否需要停止滚动
         const timeExpired = timeLimit && (Date.now() - startTime > timeLimit);
         const reachedLimit = postsLimit && holesData.length >= postsLimit;
-        
+
         if (timeExpired || reachedLimit || scrollCount > maxScrolls) {
             clearInterval(scrollInterval);
             scrollInterval = null;
             isScrolling = false;
-            
+
             if (timeExpired || reachedLimit) {
                 stopCollection();
-                scrollContainer.scrollTo({top: 0, behavior: 'smooth'});
+                scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
                 console.log("[PKU TreeHole] 达到限制条件，停止滚动");
             } else {
                 console.log("[PKU TreeHole] 滚动次数达到上限，短暂暂停后继续");
@@ -117,28 +116,28 @@ function processHoles() {
     const holes = document.querySelectorAll('.flow-item-row');
     let newHolesCount = 0;
     let reachedTimeLimit = false;
-    
+
     holes.forEach(hole => {
         if (hole.dataset.processed) return;
-        
+
         const likeNum = hole.querySelector('.box-header-badge.likenum');
         const replyElement = hole.querySelector('.box-header-badge .icon-reply');
         const idElement = hole.querySelector('.box-id');
         const contentElement = hole.querySelector('.box-content');
         const headerElement = hole.querySelector('.box-header');
         const hasImage = hole.querySelector('.box-content img') !== null;
-        
+
         if (likeNum && idElement && contentElement && headerElement) {
             const count = parseInt(likeNum.textContent.trim());
             const replies = replyElement ? parseInt(replyElement.parentElement.textContent.trim()) : 0;
             const id = idElement.textContent.trim().replace('#', '').trim();
             const content = contentElement.textContent.trim();
-            
+
             // 获取发布时间
             const headerText = headerElement.textContent;
             const timeMatch = headerText.match(/\d{2}-\d{2} \d{2}:\d{2}/);
             const publishTime = timeMatch ? timeMatch[0] : '';
-            
+
             // 检查是否达到时间限制
             if (timeLimit && publishTime) {
                 const currentYear = new Date().getFullYear();
@@ -149,7 +148,7 @@ function processHoles() {
                     return;
                 }
             }
-            
+
             // 存储数据
             const holeData = {
                 id: id,
@@ -159,7 +158,7 @@ function processHoles() {
                 publishTime: publishTime,
                 hasImage: hasImage
             };
-            
+
             // 检查是否已存在该帖子
             const existingIndex = holesData.findIndex(h => h.id === id);
             if (existingIndex === -1) {
@@ -169,20 +168,20 @@ function processHoles() {
                 holesData[existingIndex] = holeData;
             }
         }
-        
+
         hole.dataset.processed = 'true';
     });
-    
+
     if (newHolesCount > 0) {
         console.log(`[PKU TreeHole] 新增 ${newHolesCount} 条帖子，总计 ${holesData.length} 条`);
     }
-    
+
     // 检查是否需要停止收集
     if (isCollecting) {
         const currentTime = Date.now();
         const timeExpired = timeLimit && (currentTime - startTime > timeLimit);
         const reachedLimit = postsLimit && holesData.length >= postsLimit;
-        
+
         if (timeExpired || reachedLimit || reachedTimeLimit) {
             stopCollection();
         }
@@ -192,13 +191,13 @@ function processHoles() {
 // 创建 MutationObserver 来监听 DOM 变化
 const mutationObserver = new MutationObserver((mutations) => {
     let hasNewNodes = false;
-    
+
     mutations.forEach((mutation) => {
         if (mutation.addedNodes.length) {
             hasNewNodes = true;
         }
     });
-    
+
     if (hasNewNodes) {
         processHoles();
     }
@@ -211,7 +210,7 @@ function initPageObserver() {
         childList: true,
         subtree: true
     });
-    
+
     console.log("[PKU TreeHole] 已初始化页面监视器");
 }
 
@@ -223,31 +222,31 @@ function loadInitialData() {
 
 // 开始收集数据
 function startCollection(options) {
-    console.log("[PKU TreeHole] 开始收集数据，时间限制:", options.timeLimit/1000, "秒，数量限制:", options.postsLimit);
-    
+    console.log("[PKU TreeHole] 开始收集数据，时间限制:", options.timeLimit / 1000, "秒，数量限制:", options.postsLimit);
+
     // 如果正在收集中，先停止当前收集
     if (isCollecting) {
         console.log("[PKU TreeHole] 已有收集任务正在进行，重新开始...");
         stopCollection();
     }
-    
+
     // 设置新的收集参数（不清空已有数据）
     isCollecting = true;
     timeLimit = options.timeLimit;
     postsLimit = options.postsLimit;
     startTime = Date.now();
-    
+
     // 初始化页面监视
     initPageObserver();
-    
+
     // 处理当前可见帖子
     loadInitialData();
-    
+
     // 启动定期检查
     if (!checkInterval) {
         checkInterval = setInterval(processHoles, 2000); // 每2秒检查一次新数据
     }
-    
+
     // 根据选项决定是否开始自动滚动
     if (options.autoScroll) {
         console.log("[PKU TreeHole] 启用自动滚动");
@@ -255,7 +254,7 @@ function startCollection(options) {
     } else {
         console.log("[PKU TreeHole] 禁用自动滚动");
     }
-    
+
     // 返回当前已有的数据数量
     return holesData.length;
 }
@@ -263,13 +262,13 @@ function startCollection(options) {
 // 停止收集数据
 function stopCollection() {
     console.log("[PKU TreeHole] 停止收集，共收集到", holesData.length, "条帖子");
-    
+
     isCollecting = false;
     if (checkInterval) {
         clearInterval(checkInterval);
         checkInterval = null;
     }
-    
+
     if (scrollInterval) {
         clearInterval(scrollInterval);
         scrollInterval = null;
@@ -281,7 +280,7 @@ function stopCollection() {
 function clearHolesData() {
     console.log("[PKU TreeHole] 清空所有数据");
     holesData = [];
-    
+
     // 清除所有帖子的processed标记
     const holes = document.querySelectorAll('.flow-item-row');
     holes.forEach(hole => {
@@ -290,9 +289,9 @@ function clearHolesData() {
 }
 
 // 监听来自popup的消息
-chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     console.log("[PKU TreeHole] 收到消息:", request.action);
-    
+
     switch (request.action) {
         case "startCollection":
             try {
@@ -300,18 +299,18 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
                     timeLimit: request.timeLimit,
                     postsLimit: request.postsLimit
                 });
-                sendResponse({success: true, currentCount: currentCount});
+                sendResponse({ success: true, currentCount: currentCount });
             } catch (error) {
                 console.error("[PKU TreeHole] 启动收集出错:", error);
-                sendResponse({success: false, error: error.message});
+                sendResponse({ success: false, error: error.message });
             }
             break;
-            
+
         case "stopCollection":
             stopCollection();
-            sendResponse({success: true});
+            sendResponse({ success: true });
             break;
-            
+
         case "getHolesData":
             console.log("[PKU TreeHole] 发送数据，数量:", holesData.length);
             sendResponse({
@@ -320,10 +319,10 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
                 count: holesData.length
             });
             break;
-            
+
         case "clearData":
             clearHolesData();
-            sendResponse({success: true});
+            sendResponse({ success: true });
             break;
     }
     return true;
@@ -385,10 +384,10 @@ function createFloatingPanel() {
         }
     `;
     document.head.appendChild(floatingPanelStyles);
-    
+
     const panel = document.createElement('div');
     panel.id = 'pku-treehole-panel';
-    
+
     panel.innerHTML = `
         <div class="tab">
             <img src="${chrome.runtime.getURL('icon/icon48.png')}" class="icon" alt="PKU TreeHole Helper">
@@ -438,38 +437,38 @@ function createFloatingPanel() {
             </div>
         </div>
     `;
-    
+
     document.body.appendChild(panel);
-    
+
     // 保存tab元素的引用
     tabElement = panel.querySelector('.tab');
-    
+
     // 初始应用主题颜色
     applyThemeToTab();
-    
+
     // 添加MutationObserver监听主题颜色变化
     const observer = new MutationObserver(applyThemeToTab);
-    observer.observe(document.documentElement, { 
-        attributes: true, 
-        attributeFilter: ['style', 'class'] 
+    observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['style', 'class']
     });
-    
+
     // 每分钟检查一次主题颜色，以防MutationObserver未捕获到变化
     setInterval(applyThemeToTab, 60000);
-    
+
     // 对悬浮窗中的元素添加悬浮效果
     // 为输入框添加过渡效果
     const inputs = panel.querySelectorAll('input[type="number"], input[type="datetime-local"]');
     inputs.forEach(input => {
         input.style.transition = 'all 0.2s ease';
     });
-    
+
     // 为下拉框添加过渡效果
     const selects = panel.querySelectorAll('select');
     selects.forEach(select => {
         select.style.transition = 'all 0.2s ease';
     });
-    
+
     // 添加事件监听器
     const startBtn = panel.querySelector('#start-btn');
     const stopBtn = panel.querySelector('#stop-btn');
@@ -481,7 +480,7 @@ function createFloatingPanel() {
     const timeLimitInput = panel.querySelector('#time-limit');
     const postsLimitInput = panel.querySelector('#posts-limit');
     const tab = panel.querySelector('.tab');
-    
+
     // 添加点击切换面板状态的功能
     let isExpanded = false;
     tab.addEventListener('click', () => {
@@ -492,12 +491,12 @@ function createFloatingPanel() {
             panel.classList.remove('expanded');
         }
     });
-    
+
     // 点击面板内容区域时阻止事件冒泡，防止点击内容时收起面板
     panel.querySelector('.panel-content').addEventListener('click', (e) => {
         e.stopPropagation();
     });
-    
+
     // 点击页面其他区域时收起面板
     document.addEventListener('click', (e) => {
         if (!panel.contains(e.target) && isExpanded) {
@@ -505,7 +504,7 @@ function createFloatingPanel() {
             panel.classList.remove('expanded');
         }
     });
-    
+
     function updateStatus(text, isError = false) {
         statusTextElement = statusText; // 保存对状态文本元素的引用
         updateGlobalStatus(text, isError);
@@ -516,10 +515,10 @@ function createFloatingPanel() {
             holesContainer.innerHTML = '<div class="no-data">暂无数据，请点击"开始收集数据"</div>';
             return;
         }
-        
+
         holesContainer.innerHTML = '';
         const sortMethod = panel.querySelector('#sort-method').value;
-        
+
         // 根据选择的方式排序
         let sortedHoles = [...holes];
         switch (sortMethod) {
@@ -537,7 +536,7 @@ function createFloatingPanel() {
                 });
                 break;
         }
-        
+
         sortedHoles.forEach(hole => {
             const holeDiv = document.createElement('div');
             holeDiv.className = 'hole-item treehole-item-hover';
@@ -551,7 +550,7 @@ function createFloatingPanel() {
                 </div>
                 <div class="content">${hole.content}</div>
             `;
-            
+
             // 设置悬浮效果样式
             holeDiv.style.transition = 'all 0.2s ease';
             holeDiv.onmouseover = () => {
@@ -582,7 +581,7 @@ function createFloatingPanel() {
 
                     // 滚动到目标位置
                     targetHole.scrollIntoView({ behavior: "smooth", block: "center" });
-                    
+
                     // 添加高亮效果
                     targetHole.style.transition = 'background-color 0.3s ease';
                     targetHole.style.backgroundColor = '#fff3cd';
@@ -601,7 +600,7 @@ function createFloatingPanel() {
     // 设置时间输入框的默认值和清除按钮
     const endTimeInput = panel.querySelector('#end-time');
     const clearTimeBtn = panel.querySelector('#clear-time');
-    
+
     // 设置默认时间为24小时前
     const defaultTime = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const year = defaultTime.getFullYear();
@@ -610,14 +609,14 @@ function createFloatingPanel() {
     const hours = String(defaultTime.getHours()).padStart(2, '0');
     const minutes = String(defaultTime.getMinutes()).padStart(2, '0');
     endTimeInput.value = `${year}-${month}-${day}T${hours}:${minutes}`;
-    
+
     clearTimeBtn.addEventListener('click', () => {
         endTimeInput.value = '';
-        
+
         // 添加视觉反馈
         clearTimeBtn.style.backgroundColor = '#4CAF50';
         clearTimeBtn.textContent = '已清除';
-        
+
         // 0.8秒后恢复原样
         setTimeout(() => {
             clearTimeBtn.style.backgroundColor = '';
@@ -625,16 +624,16 @@ function createFloatingPanel() {
         }, 800);
     });
 
-    startBtn.addEventListener('click', function() {
+    startBtn.addEventListener('click', function () {
         startBtn.style.display = 'none';
         stopBtn.style.display = 'inline-block';
         loadingDiv.style.display = 'block';
-        
+
         const timeLimit = parseInt(timeLimitInput.value);
         const postsLimit = parseInt(postsLimitInput.value);
         const autoScrollEnabled = panel.querySelector('#auto-scroll').checked;
         const endTimeStr = endTimeInput.value;
-        
+
         // 验证结束时间
         if (endTimeStr) {
             const endTime = new Date(endTimeStr);
@@ -647,7 +646,7 @@ function createFloatingPanel() {
                     if (timeMatch) {
                         const currentYear = new Date().getFullYear();
                         const postTime = new Date(currentYear + '-' + timeMatch[1].replace(' ', ' '));
-                        
+
                         if (endTime > postTime) {
                             updateStatus('错误：设定的截止时间晚于当前可见帖子的发布时间', true);
                             startBtn.style.display = 'inline-block';
@@ -659,7 +658,7 @@ function createFloatingPanel() {
                 }
             }
         }
-        
+
         try {
             const currentCount = startCollection({
                 timeLimit: timeLimit * 60 * 1000,
@@ -674,23 +673,23 @@ function createFloatingPanel() {
         }
     });
 
-    stopBtn.addEventListener('click', function() {
+    stopBtn.addEventListener('click', function () {
         stopCollection();
         startBtn.style.display = 'inline-block';
         stopBtn.style.display = 'none';
         loadingDiv.style.display = 'none';
-        
+
         // 获取最后一条帖子的发布时间
         const lastTime = holesData.length > 0 ? holesData[holesData.length - 1].publishTime : '';
         updateStatus(`收集完成，共 ${holesData.length} 条数据${lastTime ? '，最后帖子发布于 ' + lastTime : ''}`);
         displayHoles(holesData);
     });
 
-    exportTextBtn.addEventListener('click', function() {
+    exportTextBtn.addEventListener('click', function () {
         exportHolesAsText();
     });
 
-    exportImageBtn.addEventListener('click', function() {
+    exportImageBtn.addEventListener('click', function () {
         exportHolesAsImage();
     });
 
@@ -716,17 +715,17 @@ function createCommentCollectorButton() {
     // 检查当前是否在树洞详情页
     const sidebarTitle = document.querySelector('.sidebar-title.sidebar-top');
     if (!sidebarTitle) return;
-    
+
     // 检查是否已经添加了按钮
     if (sidebarTitle.querySelector('.comment-collector-btn')) return;
-    
+
     // 创建按钮
     const button = document.createElement('a');
     button.className = 'comment-collector-btn no-underline mr10 treehole-btn-hover';
     button.innerHTML = `<img src="${chrome.runtime.getURL('icon/icon48.png')}" alt="收集评论" style="width: 20px; height: 20px; vertical-align: middle;" class="collector-icon">`;
     button.style.cursor = 'pointer';
     button.title = '收集树洞评论';
-    
+
     // 添加样式标签，使图标有更明显的放大效果和过渡动画
     const iconStyle = document.createElement('style');
     iconStyle.textContent = `
@@ -738,15 +737,15 @@ function createCommentCollectorButton() {
         }
     `;
     document.head.appendChild(iconStyle);
-    
+
     // 将按钮添加到标题栏
     const titleActions = sidebarTitle.querySelector('div');
     if (titleActions) {
         titleActions.appendChild(button);
     }
-    
+
     // 添加点击事件
-    button.addEventListener('click', function() {
+    button.addEventListener('click', function () {
         showCommentCollectorDialog();
     });
 }
@@ -760,7 +759,7 @@ function showCommentCollectorDialog() {
         dialog.style.display = 'flex';
         return;
     }
-    
+
     // 创建对话框
     dialog = document.createElement('div');
     dialog.id = 'comment-collector-dialog';
@@ -781,7 +780,7 @@ function showCommentCollectorDialog() {
     dialog.style.flexDirection = 'column';
     dialog.style.overflow = 'hidden'; // 防止内容溢出
     dialog.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", sans-serif';
-    
+
     // 按钮的通用悬浮效果样式
     const buttonHoverStyles = `
         .hover-effect {
@@ -802,12 +801,12 @@ function showCommentCollectorDialog() {
             filter: brightness(1.1);
         }
     `;
-    
+
     // 创建样式元素
     const style = document.createElement('style');
     style.textContent = buttonHoverStyles;
     document.head.appendChild(style);
-    
+
     dialog.innerHTML = `
         <div id="comment-dialog-header" style="display: flex; justify-content: space-between; align-items: center; background-color: #f5f5f5; padding: 10px 15px; border-radius: 8px 8px 0 0; cursor: move; user-select: none; flex-shrink: 0;">
             <h3 style="margin: 0; font-size: 16px; color: #333;">收集树洞评论</h3>
@@ -866,11 +865,11 @@ function showCommentCollectorDialog() {
         </div>
         <div id="resize-handle" style="position: absolute; right: 0; bottom: 0; width: 15px; height: 15px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 0%, transparent 50%, #ccc 50%, #ccc 100%); border-radius: 0 0 8px 0;"></div>
     `;
-    
+
     document.body.appendChild(dialog);
-    
+
     // 添加关闭按钮事件
-    document.getElementById('close-comment-dialog').addEventListener('click', function() {
+    document.getElementById('close-comment-dialog').addEventListener('click', function () {
         // 停止自动滚动
         stopCommentsAutoScroll(false);
         // 停止收集评论（如果正在进行）
@@ -878,15 +877,15 @@ function showCommentCollectorDialog() {
         // 只隐藏对话框，不改变其布局属性
         dialog.style.display = 'none';
     });
-    
+
     // 添加收集评论按钮事件
-    document.getElementById('toggle-collect-comments').addEventListener('click', function() {
+    document.getElementById('toggle-collect-comments').addEventListener('click', function () {
         const button = document.getElementById('toggle-collect-comments');
         if (button.textContent === '开始收集') {
             startCollectComments();
             button.textContent = '停止收集';
             button.style.backgroundColor = '#e53935';
-            
+
             // 显示统计区域
             document.getElementById('comment-stats').style.display = 'block';
         } else {
@@ -895,89 +894,89 @@ function showCommentCollectorDialog() {
             button.style.backgroundColor = '#1a73e8';
         }
     });
-    
+
     // 添加自动滚动复选框事件
     const autoScrollCheckbox = document.getElementById('auto-scroll-comments');
-    autoScrollCheckbox.addEventListener('change', function() {
+    autoScrollCheckbox.addEventListener('change', function () {
         // 改为仅设置状态，不触发滚动
         console.log("[PKU TreeHole] 自动滚动设置: " + (this.checked ? "开启" : "关闭"));
     });
-    
+
     // 添加筛选下拉框事件（初始状态下隐藏）
     const speakerFilter = document.getElementById('speaker-filter');
     if (speakerFilter) {
         speakerFilter.addEventListener('change', filterAndDisplayComments);
     }
-    
+
     // 添加导出按钮事件监听器
     const exportTextButton = document.getElementById('export-text');
     if (exportTextButton) {
         exportTextButton.addEventListener('click', exportAsText);
     }
-    
+
     const exportImageButton = document.getElementById('export-image');
     if (exportImageButton) {
         exportImageButton.addEventListener('click', exportAsImage);
     }
-    
+
     // 添加拖拽功能
     const dialogHeader = document.getElementById('comment-dialog-header');
     let isDragging = false;
     let offsetX, offsetY;
-    
-    dialogHeader.addEventListener('mousedown', function(e) {
+
+    dialogHeader.addEventListener('mousedown', function (e) {
         isDragging = true;
-        
+
         // 获取鼠标在对话框中的位置
         const dialogRect = dialog.getBoundingClientRect();
         offsetX = e.clientX - dialogRect.left;
         offsetY = e.clientY - dialogRect.top;
-        
+
         // 取消transform，使用left和top定位
         dialog.style.transform = 'none';
         dialog.style.left = dialogRect.left + 'px';
         dialog.style.top = dialogRect.top + 'px';
-        
+
         // 设置样式
         dialog.style.transition = 'none';
         dialogHeader.style.cursor = 'grabbing';
     });
-    
-    document.addEventListener('mousemove', function(e) {
+
+    document.addEventListener('mousemove', function (e) {
         if (!isDragging) return;
-        
+
         // 计算新位置
         const newLeft = e.clientX - offsetX;
         const newTop = e.clientY - offsetY;
-        
+
         // 应用新位置
         dialog.style.left = newLeft + 'px';
         dialog.style.top = newTop + 'px';
     });
-    
-    document.addEventListener('mouseup', function() {
+
+    document.addEventListener('mouseup', function () {
         if (isDragging) {
             isDragging = false;
             dialogHeader.style.cursor = 'move';
         }
     });
-    
+
     // 添加调整大小功能
     const resizeHandle = document.getElementById('resize-handle');
     let isResizing = false;
     let originalWidth, originalHeight, originalX, originalY;
-    
-    resizeHandle.addEventListener('mousedown', function(e) {
+
+    resizeHandle.addEventListener('mousedown', function (e) {
         isResizing = true;
         e.preventDefault();
-        
+
         // 获取对话框初始尺寸和鼠标位置
         const dialogRect = dialog.getBoundingClientRect();
         originalWidth = dialogRect.width;
         originalHeight = dialogRect.height;
         originalX = e.clientX;
         originalY = e.clientY;
-        
+
         // 确保对话框使用绝对定位
         if (dialog.style.transform !== 'none') {
             dialog.style.transform = 'none';
@@ -985,23 +984,23 @@ function showCommentCollectorDialog() {
             dialog.style.top = dialogRect.top + 'px';
         }
     });
-    
-    document.addEventListener('mousemove', function(e) {
+
+    document.addEventListener('mousemove', function (e) {
         if (!isResizing) return;
-        
+
         // 计算宽度和高度的变化
         const deltaWidth = e.clientX - originalX;
         const deltaHeight = e.clientY - originalY;
-        
+
         // 应用新尺寸（考虑最小尺寸限制）
         const newWidth = Math.max(300, originalWidth + deltaWidth);
         const newHeight = Math.max(200, originalHeight + deltaHeight);
-        
+
         dialog.style.width = newWidth + 'px';
         dialog.style.height = newHeight + 'px';
     });
-    
-    document.addEventListener('mouseup', function() {
+
+    document.addEventListener('mouseup', function () {
         if (isResizing) {
             isResizing = false;
         }
@@ -1016,38 +1015,38 @@ function collectComments() {
         updateCommentCollectorStatus("无法找到评论容器", true);
         return;
     }
-    
+
     // 获取所有评论元素
     const commentElements = commentsContainer.querySelectorAll(".box:not(.box-tip):not(.box33)");
     if (!commentElements || commentElements.length === 0) {
         updateCommentCollectorStatus("未找到评论", true);
         return;
     }
-    
+
     updateCommentCollectorStatus(`找到 ${commentElements.length} 条评论，正在处理...`);
-    
+
     // 收集评论数据
     const comments = [];
     const processedIds = new Set(); // 用于跟踪已处理的评论ID
-    
+
     commentElements.forEach(element => {
         // 提取评论ID
         const idElement = element.querySelector(".box-id");
         if (!idElement) return;
-        
+
         const commentId = idElement.textContent.trim();
-        
+
         // 跳过已处理的评论
         if (processedIds.has(commentId)) return;
         processedIds.add(commentId);
-        
+
         // 提取评论数据
         const commentData = extractCommentData(element);
         if (commentData) {
             comments.push(commentData);
         }
     });
-    
+
     // 显示收集到的评论
     const dialogCommentsContainer = document.getElementById("comments-container");
     if (dialogCommentsContainer) {
@@ -1055,10 +1054,10 @@ function collectComments() {
         if (!isCommentsScrolling) {
             dialogCommentsContainer.innerHTML = "";
         }
-        
+
         // 显示评论
         displayComments(comments, dialogCommentsContainer);
-        
+
         // 更新状态
         updateCommentCollectorStatus(`已收集 ${processedIds.size} 条评论`);
     }
@@ -1070,41 +1069,41 @@ function extractCommentData(commentElement) {
         // 获取评论ID
         const idElement = commentElement.querySelector('.box-id');
         const id = idElement ? idElement.textContent.trim().replace('#', '') : '';
-        
+
         // 获取说话内容和说话人
         const contentElement = commentElement.querySelector('.box-content');
         if (!contentElement) return null;
-        
+
         let speaker = '洞主'; // 默认为洞主
         let content = '';
-        
+
         // 检查是否有引用
         const quoteElement = contentElement.querySelector('.quote');
         let quote = null;
-        
+
         if (quoteElement) {
             // 有引用的情况
-            
+
             // 1. 提取引用内容
             const quoteText = quoteElement.textContent.trim();
             const firstSpaceIndex = quoteText.indexOf(' ');
-            
+
             if (firstSpaceIndex > 0) {
                 const quotedPerson = quoteText.substring(0, firstSpaceIndex).trim();
                 const quotedContent = quoteText.substring(firstSpaceIndex).trim();
-                
+
                 quote = {
                     person: quotedPerson,
                     content: quotedContent
                 };
             }
-            
+
             // 2. 获取评论者（第一个带背景色的元素）
             const speakerElements = contentElement.querySelectorAll('[style*="background-color"]');
             if (speakerElements && speakerElements.length > 0) {
                 speaker = speakerElements[0].textContent.trim();
             }
-            
+
             // 3. 获取评论内容
             // 获取所有文本行
             const textLines = contentElement.innerText.split('\n');
@@ -1117,31 +1116,41 @@ function extractCommentData(commentElement) {
             }
         } else {
             // 没有引用的情况
-            
+
             // 1. 获取评论者（通常是带背景色的元素）
             const speakerElements = contentElement.querySelectorAll('[style*="background-color"]');
             if (speakerElements && speakerElements.length > 0) {
                 speaker = speakerElements[0].textContent.trim();
             }
-            
+
             // 2. 获取评论内容（通常是没有引用时的文本内容）
             content = contentElement.textContent.trim();
-            
+
             // 3. 去除前缀 [xxx]
             content = content.replace(/\[.*?\](\s*Re\s*)?/g, '').trim();
         }
-        
+
         // 获取发布时间
         const headerElement = commentElement.querySelector('.box-header');
         const timeMatch = headerElement ? headerElement.textContent.match(/(\d{2}-\d{2} \d{2}:\d{2})/) : null;
         const publishTime = timeMatch ? timeMatch[1] : '';
-        
+
+        // 提取图片元素
+        const images = [];
+        const imgElements = contentElement.querySelectorAll('img');
+        imgElements.forEach(img => {
+            if (img.src) {
+                images.push(img.src);
+            }
+        });
+
         return {
             id,
             speaker,
             content,
             quote,
-            publishTime
+            publishTime,
+            images,  // 添加图片数组到返回数据中
         };
     } catch (error) {
         console.error('[PKU TreeHole] 提取评论数据出错:', error);
@@ -1152,12 +1161,12 @@ function extractCommentData(commentElement) {
 // 显示评论数据
 function displayComments(comments, container) {
     if (!container) return;
-    
+
     if (!comments || comments.length === 0) {
         container.innerHTML = '<div style="padding: 10px; text-align: center;">暂无评论数据</div>';
         return;
     }
-    
+
     // 为不同发言人分配不同颜色
     const speakerColors = {};
     const predefinedColors = [
@@ -1171,10 +1180,10 @@ function displayComments(comments, container) {
         '#efebe9', // 浅棕色
         '#f1f8e9'  // 浅柠檬色
     ];
-    
+
     // 收集所有发言人
     const speakers = [...new Set(comments.map(comment => comment.speaker))];
-    
+
     // 分配颜色，洞主使用固定颜色
     speakers.forEach((speaker, index) => {
         if (speaker === '洞主') {
@@ -1183,22 +1192,23 @@ function displayComments(comments, container) {
             speakerColors[speaker] = predefinedColors[index % predefinedColors.length];
         }
     });
-    
+
     comments.forEach(comment => {
         const commentDiv = document.createElement('div');
+        commentDiv.className = 'collected-comment';
         commentDiv.style.padding = '10px';
         commentDiv.style.borderBottom = '1px solid #eee';
         commentDiv.style.marginBottom = '8px';
         commentDiv.style.borderRadius = '4px';
         commentDiv.style.backgroundColor = getColorForSpeaker(comment.speaker, speakerColors);
-        
+
         let html = `
             <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
                 <span style="font-weight: bold;">${comment.speaker}</span>
                 <span style="color: #666; font-size: 12px;">${comment.publishTime}</span>
             </div>
         `;
-        
+
         if (comment.quote) {
             html += `
                 <div style="background-color: rgba(0,0,0,0.05); padding: 8px; border-left: 3px solid #ccc; margin-bottom: 8px; font-size: 12px; color: #666; border-radius: 3px;">
@@ -1206,9 +1216,18 @@ function displayComments(comments, container) {
                 </div>
             `;
         }
-        
+
         html += `<div style="line-height: 1.5;">${comment.content}</div>`;
-        
+
+        // 添加图片显示（如果存在）
+        if (comment.images && comment.images.length > 0) {
+            html += '<div class="comment-images">';
+            comment.images.forEach(imgSrc => {
+                html += `<img src="${imgSrc}" style="max-width: 100%; margin: 10px 0; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);" />`;
+            });
+            html += '</div>';
+        }
+
         commentDiv.innerHTML = html;
         container.appendChild(commentDiv);
     });
@@ -1219,18 +1238,18 @@ function getColorForSpeaker(speaker, colorMap) {
     if (colorMap[speaker]) {
         return colorMap[speaker];
     }
-    
+
     // 如果是洞主，使用灰色
     if (speaker === '洞主') {
         return '#f5f5f5';
     }
-    
+
     // 如果没有分配颜色，根据名字生成颜色
     let hash = 0;
     for (let i = 0; i < speaker.length; i++) {
         hash = speaker.charCodeAt(i) + ((hash << 5) - hash);
     }
-    
+
     const color = `hsl(${hash % 360}, 70%, 95%)`;
     colorMap[speaker] = color;
     return color;
@@ -1241,12 +1260,12 @@ function observeSidebarChanges() {
     const observer = new MutationObserver((mutations) => {
         createCommentCollectorButton();
     });
-    
+
     observer.observe(document.body, {
         childList: true,
         subtree: true
     });
-    
+
     // 初始检查
     createCommentCollectorButton();
 }
@@ -1261,6 +1280,23 @@ function addCommentCollectorStyles() {
         #start-collect-comments:hover {
             background-color: #1557b0;
         }
+        .comment-images {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .comment-images img {
+            max-width: 100%;
+            margin: 5px 0;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+            transition: all 0.3s ease;
+        }
+        .comment-images img:hover {
+            transform: scale(1.02);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        }
     `;
     document.head.appendChild(style);
 }
@@ -1268,9 +1304,9 @@ function addCommentCollectorStyles() {
 // 开始自动滚动评论页面
 function startCommentsAutoScroll() {
     if (isCommentsScrolling) return;
-    
+
     isCommentsScrolling = true;
-    
+
     // 获取评论容器
     const scrollContainer = document.querySelector(".sidebar-content");
     if (!scrollContainer) {
@@ -1278,18 +1314,18 @@ function startCommentsAutoScroll() {
         isCommentsScrolling = false;
         return;
     }
-    
+
     console.log("[PKU TreeHole] 开始自动滚动评论...");
-    
+
     // 清除可能存在的上一个滚动计时器
     if (commentsScrollInterval) {
         clearInterval(commentsScrollInterval);
     }
-    
+
     // 记录上次评论数量，用于检测是否还在加载新评论
     let lastCommentCount = 0;
     let stableCount = 0;
-    
+
     // 设置滚动间隔
     commentsScrollInterval = setInterval(() => {
         // 如果已不再收集评论，停止滚动
@@ -1297,28 +1333,28 @@ function startCommentsAutoScroll() {
             stopCommentsAutoScroll(false);
             return;
         }
-        
+
         // 滚动到页面底部以加载更多评论
         scrollContainer.scrollBy({
             top: 3000,
             behavior: 'smooth'
         });
-        
+
         // 更新评论收集状态
         updateCommentCollectorStatus("正在自动滚动加载评论...");
-        
+
         // 收集当前可见的评论
         collectComments();
-        
+
         // 检查是否已加载完全部评论（到达底部且评论数量不再增加）
         const currentCommentCount = collectedCommentIds.size;
         const isAtBottom = isScrolledToBottom(scrollContainer);
-        
+
         if (isAtBottom) {
             // 如果评论数量与上次相同，累加稳定计数
             if (currentCommentCount === lastCommentCount) {
                 stableCount++;
-                
+
                 // 如果连续3次检测到评论数量不变且在底部，认为已收集完成
                 if (stableCount >= 3) {
                     collectComments(); // 最后再收集一次
@@ -1334,10 +1370,10 @@ function startCommentsAutoScroll() {
             // 不在底部，重置稳定计数
             stableCount = 0;
         }
-        
+
         // 更新上次评论数量
         lastCommentCount = currentCommentCount;
-        
+
     }, 1500);
 }
 
@@ -1348,7 +1384,7 @@ function stopCommentsAutoScroll(updateCheckbox = true) {
         commentsScrollInterval = null;
     }
     isCommentsScrolling = false;
-    
+
     // 根据参数决定是否更新复选框状态
     if (updateCheckbox) {
         const autoScrollCheckbox = document.getElementById('auto-scroll-comments');
@@ -1356,7 +1392,7 @@ function stopCommentsAutoScroll(updateCheckbox = true) {
             autoScrollCheckbox.checked = false;
         }
     }
-    
+
     console.log("[PKU TreeHole] 停止自动滚动评论");
 }
 
@@ -1378,7 +1414,7 @@ function updateCommentCollectorStatus(text, isError = false) {
 // 开始收集评论
 function startCollectComments() {
     if (isCollectingComments) return;
-    
+
     // 重置变量
     isCollectingComments = true;
     commentCollectionStartTime = Date.now();
@@ -1386,38 +1422,38 @@ function startCollectComments() {
     earliestCommentTime = null;
     allCommentsData = []; // 清空所有评论数据
     speakerList.clear(); // 清空发言人列表
-    
+
     // 清空评论容器
     const commentsContainer = document.getElementById('comments-container');
     if (commentsContainer) {
         commentsContainer.innerHTML = '';
     }
-    
+
     // 隐藏筛选控件（收集过程中不显示）
     const commentFilter = document.getElementById('comment-filter');
     if (commentFilter) {
         commentFilter.style.display = 'none';
     }
-    
+
     // 隐藏导出控件（收集过程中不显示）
     const exportControls = document.getElementById('export-controls');
     if (exportControls) {
         exportControls.style.display = 'none';
     }
-    
+
     // 重置统计信息
     updateCommentStats(0, 0, '-');
-    
+
     // 开始收集
     updateCommentCollectorStatus('开始收集评论...');
     collectComments(true);
-    
+
     // 设置计时器，定期更新用时
     commentCollectionTimer = setInterval(() => {
         const elapsedSeconds = Math.floor((Date.now() - commentCollectionStartTime) / 1000);
         updateCollectionTime(elapsedSeconds);
     }, 1000);
-    
+
     // 如果自动滚动选项已勾选，则开始自动滚动
     const autoScrollCheckbox = document.getElementById('auto-scroll-comments');
     if (autoScrollCheckbox && autoScrollCheckbox.checked) {
@@ -1428,40 +1464,40 @@ function startCollectComments() {
 // 停止收集评论
 function stopCollectComments() {
     if (!isCollectingComments) return;
-    
+
     isCollectingComments = false;
-    
+
     // 停止计时器
     if (commentCollectionTimer) {
         clearInterval(commentCollectionTimer);
         commentCollectionTimer = null;
     }
-    
+
     // 停止自动滚动（但不取消复选框勾选）
     stopCommentsAutoScroll(false);
-    
+
     // 更新UI按钮状态
     const toggleButton = document.getElementById('toggle-collect-comments');
     if (toggleButton) {
         toggleButton.textContent = '开始收集';
         toggleButton.style.backgroundColor = '#1a73e8';
     }
-    
+
     // 显示筛选控件
     const commentFilter = document.getElementById('comment-filter');
     if (commentFilter) {
         commentFilter.style.display = 'block';
     }
-    
+
     // 显示导出控件
     const exportControls = document.getElementById('export-controls');
     if (exportControls) {
         exportControls.style.display = 'block';
     }
-    
+
     // 更新筛选下拉框
     updateSpeakerFilter();
-    
+
     // 添加筛选下拉框的事件监听
     const speakerFilter = document.getElementById('speaker-filter');
     if (speakerFilter) {
@@ -1470,14 +1506,14 @@ function stopCollectComments() {
         // 添加新的监听器
         speakerFilter.addEventListener('change', filterAndDisplayComments);
     }
-    
+
     updateCommentCollectorStatus(`收集完成，共 ${collectedCommentIds.size} 条评论`);
 }
 
 // 收集评论
 function collectComments(isInitialCollection = false) {
     if (!isCollectingComments && !isInitialCollection) return;
-    
+
     // 获取评论容器
     const commentsContainer = document.querySelector(".sidebar-content");
     if (!commentsContainer) {
@@ -1485,7 +1521,7 @@ function collectComments(isInitialCollection = false) {
         stopCollectComments();
         return;
     }
-    
+
     // 获取所有评论元素
     const commentElements = commentsContainer.querySelectorAll(".box:not(.box-tip):not(.box33)");
     if (!commentElements || commentElements.length === 0) {
@@ -1495,21 +1531,21 @@ function collectComments(isInitialCollection = false) {
         }
         return;
     }
-    
+
     // 收集评论数据
     const newComments = [];
     let newCommentsCount = 0;
-    
+
     commentElements.forEach(element => {
         // 提取评论ID
         const idElement = element.querySelector(".box-id");
         if (!idElement) return;
-        
+
         const commentId = idElement.textContent.trim();
-        
+
         // 跳过已处理的评论
         if (collectedCommentIds.has(commentId)) return;
-        
+
         // 获取发布时间
         const headerElement = element.querySelector(".box-header");
         let publishTime = null;
@@ -1517,36 +1553,36 @@ function collectComments(isInitialCollection = false) {
             const timeText = headerElement.textContent.match(/(\d{2}-\d{2} \d{2}:\d{2})/);
             if (timeText && timeText[1]) {
                 publishTime = timeText[1];
-                
+
                 // 更新最早评论时间
                 if (!earliestCommentTime || publishTime < earliestCommentTime) {
                     earliestCommentTime = publishTime;
                 }
             }
         }
-        
+
         // 提取评论数据
         const commentData = extractCommentData(element);
         if (commentData) {
             // 添加评论ID和发布时间
             commentData.id = commentId;
             commentData.publishTime = publishTime;
-            
+
             // 添加到新评论列表
             newComments.push(commentData);
             collectedCommentIds.add(commentId);
             newCommentsCount++;
-            
+
             // 将发言人添加到列表中
             if (commentData.speaker) {
                 speakerList.add(commentData.speaker);
             }
-            
+
             // 添加到全部评论数据中
             allCommentsData.push(commentData);
         }
     });
-    
+
     // 显示收集到的评论
     if (newCommentsCount > 0) {
         const dialogCommentsContainer = document.getElementById("comments-container");
@@ -1554,14 +1590,14 @@ function collectComments(isInitialCollection = false) {
             // 清空现有评论并显示全部
             dialogCommentsContainer.innerHTML = '';
             displayComments(allCommentsData, dialogCommentsContainer);
-            
+
             // 更新统计信息
             updateCommentStats(
                 collectedCommentIds.size,
                 Math.floor((Date.now() - commentCollectionStartTime) / 1000),
                 earliestCommentTime || '-'
             );
-            
+
             // 更新状态
             updateCommentCollectorStatus(`已收集 ${collectedCommentIds.size} 条评论`);
         }
@@ -1573,7 +1609,7 @@ function updateCommentStats(count, timeInSeconds, earliestTime) {
     const countElement = document.getElementById('comment-count');
     const timeElement = document.getElementById('collection-time');
     const earliestTimeElement = document.getElementById('earliest-comment-time');
-    
+
     if (countElement) countElement.textContent = count;
     if (timeElement) timeElement.textContent = formatTime(timeInSeconds);
     if (earliestTimeElement) earliestTimeElement.textContent = earliestTime;
@@ -1607,15 +1643,15 @@ function formatTime(seconds) {
 function updateSpeakerFilter() {
     const speakerFilter = document.getElementById('speaker-filter');
     if (!speakerFilter) return;
-    
+
     // 保存当前选择
     const currentSelection = speakerFilter.value;
-    
+
     // 清空现有选项，只保留"全部评论"
     while (speakerFilter.options.length > 1) {
         speakerFilter.remove(1);
     }
-    
+
     // 添加所有发言人作为选项
     speakerList.forEach(speaker => {
         const option = document.createElement('option');
@@ -1623,7 +1659,7 @@ function updateSpeakerFilter() {
         option.textContent = speaker;
         speakerFilter.appendChild(option);
     });
-    
+
     // 恢复之前的选择（如果存在于新列表中）
     if (currentSelection && speakerList.has(currentSelection)) {
         speakerFilter.value = currentSelection;
@@ -1635,25 +1671,25 @@ function filterAndDisplayComments() {
     const speakerFilter = document.getElementById('speaker-filter');
     const selectedSpeaker = speakerFilter ? speakerFilter.value : '';
     const commentsContainer = document.getElementById('comments-container');
-    
+
     if (!commentsContainer) return;
-    
+
     // 筛选评论
     let filteredComments = allCommentsData;
     if (selectedSpeaker) {
         filteredComments = allCommentsData.filter(comment => comment.speaker === selectedSpeaker);
     }
-    
+
     // 显示筛选后的评论
     commentsContainer.innerHTML = ''; // 清空容器
-    
+
     if (filteredComments.length === 0) {
         commentsContainer.innerHTML = '<div style="padding: 10px; text-align: center; color: #666;">没有找到符合条件的评论</div>';
         return;
     }
-    
+
     displayComments(filteredComments, commentsContainer);
-    
+
     // 更新状态信息
     if (selectedSpeaker) {
         updateCommentCollectorStatus(`显示 ${selectedSpeaker} 的 ${filteredComments.length} 条评论（共收集 ${allCommentsData.length} 条）`);
@@ -1667,25 +1703,26 @@ function exportAsText() {
     // 获取当前显示的评论
     const speakerFilter = document.getElementById('speaker-filter');
     const selectedSpeaker = speakerFilter ? speakerFilter.value : '';
-    
+
     // 筛选评论
     let comments = allCommentsData;
     if (selectedSpeaker) {
         comments = allCommentsData.filter(comment => comment.speaker === selectedSpeaker);
     }
-    
+
     if (comments.length === 0) {
         alert('没有可导出的评论');
         return;
     }
-    
+
     // 生成帖子信息
     const holeTitle = document.querySelector('.sidebar-title.sidebar-top');
     const holeTitleMatch = holeTitle ? holeTitle.textContent.match(/#\d+/) : null;
     const holeId = holeTitleMatch ? holeTitleMatch[0] : (holeTitle ? holeTitle.textContent.trim() : '未知帖子');
+    const totalFollows = comments[0].follows || 0;
     const totalComments = comments.length;
     const exportTime = new Date().toLocaleString();
-    
+
     // 生成文本内容
     let textContent = `# ${holeId}\n`;
     textContent += `# 导出时间：${exportTime}\n`;
@@ -1695,36 +1732,36 @@ function exportAsText() {
     }
     textContent += `# 最早评论时间：${earliestCommentTime || '未知'}\n`;
     textContent += `\n-------------------------------\n\n`;
-    
+
     // 添加每条评论
     comments.forEach((comment, index) => {
         // 评论ID和发言人信息
         textContent += `[${index + 1}] ID: ${comment.id || ''} | 发言人: ${comment.speaker || '匿名'}`;
-        
+
         // 添加发布时间
         if (comment.publishTime) {
             textContent += ` | 时间: ${comment.publishTime}`;
         }
         textContent += `\n\n`;
-        
+
         // 如果有引用内容，先显示引用
         if (comment.quote) {
             textContent += `【引用】${comment.quote.person || '匿名'}: ${comment.quote.content}\n\n`;
         }
-        
+
         // 添加评论主体内容
         textContent += `${comment.content || ''}\n\n`;
-        
+
         textContent += `-------------------------------\n\n`;
     });
-    
+
     // 创建下载链接
     const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    
+
     // 设置文件名
     const fileName = `TreeHole${holeId}_${new Date().getTime()}.txt`;
-    
+
     // 创建并触发下载
     const a = document.createElement('a');
     a.href = url;
@@ -1732,13 +1769,13 @@ function exportAsText() {
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-    
+
     // 清理资源
     setTimeout(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }, 100);
-    
+
     updateCommentCollectorStatus(`已导出 ${totalComments} 条评论为文本文件`);
 }
 
@@ -1750,21 +1787,21 @@ function exportAsImage() {
         alert('找不到评论容器');
         return;
     }
-    
+
     // 检查是否有评论
-    if (commentsContainer.children.length === 0 || 
+    if (commentsContainer.children.length === 0 ||
         (commentsContainer.children.length === 1 && commentsContainer.children[0].textContent.includes('暂无评论数据'))) {
         alert('没有可导出的评论');
         return;
     }
-    
+
     // 获取帖子信息
     const holeTitle = document.querySelector('.sidebar-title.sidebar-top');
     const holeTitleMatch = holeTitle ? holeTitle.textContent.match(/#\d+/) : null;
     const holeId = holeTitleMatch ? holeTitleMatch[0] : (holeTitle ? holeTitle.textContent.trim() : '未知帖子');
     const speakerFilter = document.getElementById('speaker-filter');
     const selectedSpeaker = speakerFilter && speakerFilter.value ? speakerFilter.value : '全部';
-    
+
     // 创建一个临时容器，用于生成图片
     const tempContainer = document.createElement('div');
     tempContainer.style.backgroundColor = 'white';
@@ -1773,13 +1810,13 @@ function exportAsImage() {
     tempContainer.style.fontFamily = 'Arial, sans-serif';
     tempContainer.style.position = 'absolute';
     tempContainer.style.left = '-9999px';
-    
+
     // 添加标题和信息
     const header = document.createElement('div');
     header.style.marginBottom = '20px';
     header.style.borderBottom = '2px solid #eee';
     header.style.paddingBottom = '10px';
-    
+
     header.innerHTML = `
         <h2 style="margin: 0 0 10px 0;">${holeId}</h2>
         <div style="color: #666; font-size: 14px;">
@@ -1788,19 +1825,19 @@ function exportAsImage() {
             <div>最早评论时间：${earliestCommentTime || '未知'}</div>
         </div>
     `;
-    
+
     tempContainer.appendChild(header);
-    
+
     // 复制评论内容
     const contentClone = commentsContainer.cloneNode(true);
     contentClone.style.border = 'none';
     contentClone.style.maxWidth = '100%';
-    
+
     tempContainer.appendChild(contentClone);
-    
+
     // 添加到文档以便截图
     document.body.appendChild(tempContainer);
-    
+
     // 使用html2canvas截图
     loadHtml2Canvas()
         .then((html2canvasFunc) => {
@@ -1814,13 +1851,13 @@ function exportAsImage() {
         .then(canvas => {
             // 移除临时容器
             document.body.removeChild(tempContainer);
-            
+
             // 转换为图片URL
             const imageUrl = canvas.toDataURL('image/png');
-            
+
             // 设置文件名
             const fileName = `TreeHole${holeId}_${new Date().getTime()}.png`;
-            
+
             // 创建并触发下载
             const a = document.createElement('a');
             a.href = imageUrl;
@@ -1828,12 +1865,12 @@ function exportAsImage() {
             a.style.display = 'none';
             document.body.appendChild(a);
             a.click();
-            
+
             // 清理资源
             setTimeout(() => {
                 document.body.removeChild(a);
             }, 100);
-            
+
             updateCommentCollectorStatus(`已导出评论为图片`);
         })
         .catch(error => {
@@ -1850,7 +1887,7 @@ function loadHtml2Canvas() {
             resolve(window.__html2canvasCaptureFunc);
             return;
         }
-        
+
         // 注入脚本加载函数
         function injectScript(src, onError) {
             const script = document.createElement('script');
@@ -1859,26 +1896,26 @@ function loadHtml2Canvas() {
             document.head.appendChild(script);
             return script;
         }
-        
+
         // 创建截图函数
         const createCaptureFunction = () => {
             return (element, options) => {
                 return new Promise((resolveCapture, rejectCapture) => {
                     const captureId = 'capture_' + Date.now();
-                    
+
                     // 监听结果
                     const captureListener = (event) => {
-                        if (!event.data || 
-                            event.data.type !== 'HTML2CANVAS_RESULT' || 
+                        if (!event.data ||
+                            event.data.type !== 'HTML2CANVAS_RESULT' ||
                             event.data.captureId !== captureId) return;
-                        
+
                         window.removeEventListener('message', captureListener);
-                        
+
                         if (event.data.error) {
                             rejectCapture(new Error(event.data.error));
                             return;
                         }
-                        
+
                         // 从数据URL创建Canvas
                         const img = new Image();
                         img.onload = () => {
@@ -1892,14 +1929,14 @@ function loadHtml2Canvas() {
                         img.onerror = () => rejectCapture(new Error('无法从数据URL创建图像'));
                         img.src = event.data.dataUrl;
                     };
-                    
+
                     window.addEventListener('message', captureListener);
-                    
+
                     // 使用临时ID标记元素
                     const tempId = 'html2canvas_temp_' + Date.now();
                     const originalId = element.id;
                     element.id = tempId;
-                    
+
                     // 发送捕获请求
                     window.postMessage({
                         type: 'HTML2CANVAS_CAPTURE_REQUEST',
@@ -1907,7 +1944,7 @@ function loadHtml2Canvas() {
                         selector: '#' + tempId,
                         options: options
                     }, '*');
-                    
+
                     // 恢复原始ID
                     setTimeout(() => {
                         if (originalId) {
@@ -1919,29 +1956,29 @@ function loadHtml2Canvas() {
                 });
             };
         };
-        
+
         // 监听执行器加载完成的消息
         const executorLoadedListener = (event) => {
             if (event.data && event.data.type === 'HTML2CANVAS_EXECUTOR_LOADED') {
                 window.removeEventListener('message', executorLoadedListener);
-                
+
                 // 创建并保存截图函数
                 const captureFunc = createCaptureFunction();
                 window.__html2canvasCaptureFunc = captureFunc;
                 window.__html2canvasReady = true;
-                
+
                 resolve(captureFunc);
             }
         };
-        
+
         window.addEventListener('message', executorLoadedListener);
-        
+
         // 先加载html2canvas库，然后加载执行器
         const html2canvasScript = injectScript(
             chrome.runtime.getURL('assets/html2canvas.min.js'),
             () => reject(new Error('无法加载html2canvas库'))
         );
-        
+
         html2canvasScript.onload = () => {
             injectScript(
                 chrome.runtime.getURL('assets/html2canvas-executor.js'),
@@ -1964,7 +2001,7 @@ if (document.readyState === 'loading') {
     createFloatingPanel();
     observeSidebarChanges();
     addCommentCollectorStyles();
-} 
+}
 
 // 导出悬浮窗中的树洞数据为文本格式
 function exportHolesAsText() {
@@ -1972,28 +2009,28 @@ function exportHolesAsText() {
         updateGlobalStatus('没有可导出的数据，请先收集数据', true);
         return;
     }
-    
+
     // 获取当前显示的排序方式
     const sortMethod = document.querySelector('#sort-method').value;
-    
+
     // 生成文本内容
     let textContent = `# PKU树洞数据导出\n`;
     textContent += `# 导出时间：${new Date().toLocaleString()}\n`;
     textContent += `# 帖子数量：${holesData.length}\n`;
     textContent += `# 排序方式：${getSortMethodName(sortMethod)}\n`;
-    
+
     // 获取最早和最新的帖子时间
     const timeData = holesData.map(hole => {
         const parts = hole.publishTime.split(' ');
         return parts.length > 1 ? parts[1] + ' ' + parts[0] : hole.publishTime;
     }).sort();
-    
+
     if (timeData.length > 0) {
         textContent += `# 时间范围：${timeData[0]} 至 ${timeData[timeData.length - 1]}\n`;
     }
-    
+
     textContent += `\n-------------------------------\n\n`;
-    
+
     // 根据当前排序方式排序
     let sortedHoles = [...holesData];
     switch (sortMethod) {
@@ -2011,21 +2048,21 @@ function exportHolesAsText() {
             });
             break;
     }
-    
+
     // 添加每个树洞的数据
     sortedHoles.forEach((hole, index) => {
         textContent += `[${index + 1}] ID: #${hole.id} | 收藏数: ${hole.likeCount} | 评论数: ${hole.replyCount} | 发布时间: ${hole.publishTime}\n\n`;
         textContent += `${hole.content || '无内容'}\n\n`;
         textContent += `-------------------------------\n\n`;
     });
-    
+
     // 创建下载链接
     const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    
+
     // 设置文件名
     const fileName = `PKU_TreeHole_导出_${new Date().getTime()}.txt`;
-    
+
     // 创建并触发下载
     const a = document.createElement('a');
     a.href = url;
@@ -2033,13 +2070,13 @@ function exportHolesAsText() {
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-    
+
     // 清理资源
     setTimeout(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }, 100);
-    
+
     updateGlobalStatus(`已导出 ${sortedHoles.length} 条帖子数据为文本文件`);
 }
 
@@ -2049,7 +2086,7 @@ function exportHolesAsImage() {
         updateGlobalStatus('没有可导出的数据，请先收集数据', true);
         return;
     }
-    
+
     // 创建一个临时容器用于生成图片
     const tempContainer = document.createElement('div');
     tempContainer.style.backgroundColor = '#ffffff';
@@ -2059,10 +2096,10 @@ function exportHolesAsImage() {
     tempContainer.style.position = 'absolute';
     tempContainer.style.left = '-9999px';
     tempContainer.style.top = '-9999px';
-    
+
     // 获取当前显示的排序方式
     const sortMethod = document.querySelector('#sort-method').value;
-    
+
     // 添加标题和统计信息
     tempContainer.innerHTML = `
         <div style="text-align: center; margin-bottom: 20px;">
@@ -2073,7 +2110,7 @@ function exportHolesAsImage() {
         </div>
         <div style="border-top: 1px solid #ddd; margin: 10px 0;"></div>
     `;
-    
+
     // 根据当前排序方式排序
     let sortedHoles = [...holesData];
     switch (sortMethod) {
@@ -2091,10 +2128,10 @@ function exportHolesAsImage() {
             });
             break;
     }
-    
+
     // 只展示前30条数据，防止图片过大
     const displayHoles = sortedHoles.slice(0, 30);
-    
+
     // 创建每个树洞的卡片
     displayHoles.forEach((hole, index) => {
         const holeCard = document.createElement('div');
@@ -2103,7 +2140,7 @@ function exportHolesAsImage() {
         holeCard.style.padding = '15px';
         holeCard.style.marginBottom = '15px';
         holeCard.style.backgroundColor = '#f8f9fa';
-        
+
         holeCard.innerHTML = `
             <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                 <span style="font-weight: bold; color: #1a73e8;">#${hole.id}</span>
@@ -2115,10 +2152,10 @@ function exportHolesAsImage() {
             </div>
             <div style="margin-bottom: 10px; line-height: 1.5; color: #333; word-break: break-all;">${hole.content || '无内容'}</div>
         `;
-        
+
         tempContainer.appendChild(holeCard);
     });
-    
+
     // 如果有更多数据但没有显示，添加提示
     if (sortedHoles.length > 30) {
         const moreInfo = document.createElement('div');
@@ -2128,10 +2165,10 @@ function exportHolesAsImage() {
         moreInfo.textContent = `注：图片中仅显示前30条数据，共有 ${sortedHoles.length} 条数据。请使用文本导出获取完整数据。`;
         tempContainer.appendChild(moreInfo);
     }
-    
+
     // 添加到文档以便截图
     document.body.appendChild(tempContainer);
-    
+
     // 使用html2canvas截图
     loadHtml2Canvas()
         .then((html2canvasFunc) => {
@@ -2145,14 +2182,14 @@ function exportHolesAsImage() {
         .then(canvas => {
             // 移除临时容器
             document.body.removeChild(tempContainer);
-            
+
             // 将canvas转换为图片并下载
             const imgData = canvas.toDataURL('image/png');
             const link = document.createElement('a');
             link.href = imgData;
             link.download = `PKU_TreeHole_导出_${new Date().getTime()}.png`;
             link.click();
-            
+
             updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
         })
         .catch(error => {
