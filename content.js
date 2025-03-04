@@ -59,6 +59,7 @@ let commentCollectionStartTime = 0;
 let commentCollectionTimer = null;
 let collectedCommentIds = new Set();
 let earliestCommentTime = null;
+let latestCommentTime = null; // 新增：用于记录最晚评论时间
 let totalExpectedComments = 0; // 预期的总评论数量
 
 // 自动滚动函数
@@ -833,16 +834,20 @@ function showCommentCollectorDialog() {
                         <span id="collection-time">0秒</span>
                     </div>
                     <div style="display: flex; justify-content: space-between;">
-                        <span>最早评论时间：</span>
+                        <span>最晚评论时间：</span>
                         <span id="earliest-comment-time">-</span>
                     </div>
+                    <!--div style="display: flex; justify-content: space-between;">
+                        <span>最晚评论时间：</span>
+                        <span id="latest-comment-time">-</span>
+                    </div-->
                 </div>
                 
                 <div id="comment-filter" style="display: none; margin-top: 10px;">
                     <div style="display: flex; align-items: center; margin-bottom: 8px;">
                         <label for="speaker-filter" style="margin-right: 8px; font-size: 13px;">只看：</label>
                         <select id="speaker-filter" style="flex-grow: 1; padding: 5px; border-radius: 4px; border: 1px solid #ddd; font-size: 13px;">
-                            <option value="">全部评论</option>
+                            <option value="all">全部评论</option>
                         </select>
                     </div>
                 </div>
@@ -1060,6 +1065,11 @@ function collectComments(isInitialCollection = false) {
                 if (!earliestCommentTime || publishTime < earliestCommentTime) {
                     earliestCommentTime = publishTime;
                 }
+                
+                // 更新最晚评论时间
+                if (!latestCommentTime || publishTime > latestCommentTime) {
+                    latestCommentTime = publishTime;
+                }
             }
         }
         
@@ -1177,7 +1187,7 @@ function collectComments(isInitialCollection = false) {
         updateCommentStats(
             collectedCount,
             Math.floor((Date.now() - commentCollectionStartTime) / 1000),
-            earliestCommentTime || '未知'
+            latestCommentTime || '未知'
         );
     }
     
@@ -1638,6 +1648,7 @@ function startCollectComments() {
     commentCollectionStartTime = Date.now();
     collectedCommentIds.clear();
     earliestCommentTime = null;
+    latestCommentTime = null; // 新增：用于记录最晚评论时间
     allCommentsData = []; // 清空所有评论数据
     speakerList.clear(); // 清空发言人列表
 
@@ -1742,17 +1753,17 @@ function stopCollectComments() {
     updateCommentStats(
         collectedCount,
         Math.floor((Date.now() - commentCollectionStartTime) / 1000),
-        earliestCommentTime || '未知'
+        latestCommentTime || '未知'
     );
 
     updateCommentCollectorStatus(`收集完成，共 ${collectedCount} 条评论`);
 }
 
 // 更新评论统计信息
-function updateCommentStats(count, timeInSeconds, earliestTime) {
+function updateCommentStats(count, timeInSeconds, latestTime) {
     const countElement = document.getElementById('comment-count');
     const timeElement = document.getElementById('collection-time');
-    const earliestTimeElement = document.getElementById('earliest-comment-time');
+    const latestTimeElement = document.getElementById('earliest-comment-time');
     
     // 计算进度百分比
     let progressPercentage = '';
@@ -1763,7 +1774,7 @@ function updateCommentStats(count, timeInSeconds, earliestTime) {
 
     if (countElement) countElement.textContent = `${count}${progressPercentage}`;
     if (timeElement) timeElement.textContent = formatTime(timeInSeconds);
-    if (earliestTimeElement) earliestTimeElement.textContent = earliestTime;
+    if (latestTimeElement) latestTimeElement.textContent = latestTime;
 }
 
 // 更新收集用时
@@ -1797,7 +1808,8 @@ function updateSpeakerFilter() {
     
     // 保存当前选中的值
     const speakerFilter = document.getElementById('speaker-filter');
-    const selectedValue = speakerFilter ? speakerFilter.value : 'all';
+    // 默认值设为'all'，即全部评论
+    const selectedValue = speakerFilter && speakerFilter.value ? speakerFilter.value : 'all';
     
     // 清空下拉框
     if (speakerFilter) {
@@ -1832,7 +1844,7 @@ function updateSpeakerFilter() {
             speakerFilter.appendChild(option);
         });
         
-        // 恢复选中的值
+        // 恢复选中的值，确保默认是'all'
         speakerFilter.value = selectedValue;
     }
 }
@@ -1907,7 +1919,7 @@ function exportAsText() {
     if (selectedSpeaker !== 'all') {
         textContent += `# 筛选条件：只看 ${selectedSpeaker}\n`;
     }
-    textContent += `# 最早评论时间：${earliestCommentTime || '未知'}\n`;
+    textContent += `# 最晚评论时间：${latestCommentTime || '未知'}\n`;
     textContent += `\n-------------------------------\n\n`;
     
     // 先添加主贴信息(如果有)
@@ -1987,7 +1999,8 @@ function exportAsImage() {
     const holeTitleMatch = holeTitle ? holeTitle.textContent.match(/#\d+/) : null;
     const holeId = holeTitleMatch ? holeTitleMatch[0] : (holeTitle ? holeTitle.textContent.trim() : '未知帖子');
     const speakerFilter = document.getElementById('speaker-filter');
-    const selectedSpeaker = speakerFilter && speakerFilter.value ? speakerFilter.value : '全部';
+    const selectedSpeaker = speakerFilter && speakerFilter.value ? speakerFilter.value : 'all';
+    const displaySpeaker = selectedSpeaker === 'all' ? '全部' : selectedSpeaker;
 
     // 创建一个临时容器，用于生成图片
     const tempContainer = document.createElement('div');
@@ -2008,8 +2021,8 @@ function exportAsImage() {
         <h2 style="margin: 0 0 10px 0;">${holeId}</h2>
         <div style="color: #666; font-size: 14px;">
             <div>导出时间：${new Date().toLocaleString()}</div>
-            <div>评论数量：${allCommentsData.length} (显示: ${selectedSpeaker === '全部' ? '全部' : `只看 ${selectedSpeaker}`})</div>
-            <div>最早评论时间：${earliestCommentTime || '未知'}</div>
+            <div>评论数量：${allCommentsData.length} (显示: ${displaySpeaker})</div>
+            <div>最晚评论时间：${latestCommentTime || '未知'}</div>
         </div>
     `;
 
