@@ -9,7 +9,7 @@ let scrollInterval = null;
 let isScrolling = false;
 let endTime = null;
 let commentsData = []; // 存储评论数据
-let allCommentsData = []; // 存储所有收集到的评论数据
+let allCommentsData = []; // 存储所有评论数据
 let speakerList = new Set(); // 存储所有发言人列表
 let statusTextElement = null; // 状态文本元素引用
 let tabElement = null; // tab元素引用
@@ -59,6 +59,7 @@ let commentCollectionStartTime = 0;
 let commentCollectionTimer = null;
 let collectedCommentIds = new Set();
 let earliestCommentTime = null;
+let totalExpectedComments = 0; // 预期的总评论数量
 
 // 自动滚动函数
 function autoScroll() {
@@ -1008,7 +1009,7 @@ function showCommentCollectorDialog() {
 }
 
 // 收集评论
-function collectComments() {
+function collectComments(isInitialCollection = false) {
     // 获取评论容器
     const commentsContainer = document.querySelector(".sidebar-content");
     if (!commentsContainer) {
@@ -1028,8 +1029,16 @@ function collectComments() {
     // 收集评论数据
     const comments = [];
     const processedIds = new Set(); // 用于跟踪已处理的评论ID
+    
+    // 标记是否找到了主贴
+    let foundMainPost = false;
+    let mainPostData = null;
+    
+    // 记录这次处理的非主贴评论
+    const nonMainPostComments = [];
 
-    commentElements.forEach(element => {
+    // 处理评论元素
+    commentElements.forEach((element, index) => {
         // 提取评论ID
         const idElement = element.querySelector(".box-id");
         if (!idElement) return;
@@ -1038,29 +1047,141 @@ function collectComments() {
 
         // 跳过已处理的评论
         if (processedIds.has(commentId)) return;
-        processedIds.add(commentId);
-
-        // 提取评论数据
-        const commentData = extractCommentData(element);
+        
+        // 获取发布时间
+        const headerElement = element.querySelector(".box-header");
+        let publishTime = null;
+        if (headerElement) {
+            const timeMatch = headerElement.textContent.match(/(\d{2}-\d{2} \d{2}:\d{2})/);
+            if (timeMatch && timeMatch[1]) {
+                publishTime = timeMatch[1];
+                
+                // 更新最早评论时间
+                if (!earliestCommentTime || publishTime < earliestCommentTime) {
+                    earliestCommentTime = publishTime;
+                }
+            }
+        }
+        
+        let commentData;
+        
+        // 检查是否为主贴
+        // 策略1：第一条评论总是尝试作为主贴处理
+        // 策略2：检查是否有收藏按钮/数量来判断是否为主贴
+        const isLikelyMainPost = index === 0 || 
+                                element.querySelector('.box-header-badge .icon-star') || 
+                                element.querySelector('.box-header-badge .icon-star-ok');
+        
+        if (isLikelyMainPost) {
+            // 尝试提取为主贴
+            commentData = extractMainPostData(element);
+            
+            // 如果成功提取为主贴且包含必要数据，标记为找到主贴
+            if (commentData && (commentData.stars > 0 || commentData.comments > 0)) {
+                foundMainPost = true;
+                mainPostData = commentData;
+            } else if (commentData) {
+                // 即使没有收藏数/评论数，如果是第一条也视为主贴
+                if (index === 0) {
+                    foundMainPost = true;
+                    mainPostData = commentData;
+                } else {
+                    // 否则按普通评论处理
+                    commentData = extractCommentData(element);
+                    if (commentData) {
+                        nonMainPostComments.push(commentData);
+                    }
+                }
+            }
+        } else {
+            // 处理普通评论
+            commentData = extractCommentData(element);
+            if (commentData) {
+                nonMainPostComments.push(commentData);
+            }
+        }
+        
         if (commentData) {
+            if (publishTime) {
+                commentData.publishTime = publishTime;
+            }
             comments.push(commentData);
+            processedIds.add(commentId);
+            
+            // 将收集到的评论ID添加到全局集合
+            collectedCommentIds.add(commentId);
+            
+            // 如果不是主贴，将发言人添加到全局集合
+            if (!commentData.isMainPost && commentData.speaker) {
+                speakerList.add(commentData.speaker);
+            }
         }
     });
+    
+    // 将非主贴评论添加到全局数组
+    // 使用Set去重，避免重复添加同一条评论
+    if (foundMainPost && mainPostData 
+        && !allCommentsData.find(comment => comment.isMainPost)) {
+        allCommentsData.push(mainPostData);
+    }
+
+    nonMainPostComments.forEach(comment => {
+        // 检查评论是否已经存在于allCommentsData中
+        const isDuplicate = allCommentsData.some(existingComment => 
+            existingComment.id === comment.id);
+        
+        if (!isDuplicate) {
+            allCommentsData.push(comment);
+        }
+    });
+    
+    // 如果找到了主贴，更新全局统计信息
+    if (foundMainPost && mainPostData) {
+        // 更新全局统计信息
+        totalExpectedComments = mainPostData.comments || 0;
+        
+        // 根据是否有评论显示不同的信息
+        if (totalExpectedComments > 0) {
+            updateCommentCollectorStatus(`开始收集评论 (共 ${totalExpectedComments} 条)`);
+        } else {
+            updateCommentCollectorStatus(`开始收集评论 (暂无其他评论)`);
+        }
+    }
 
     // 显示收集到的评论
     const dialogCommentsContainer = document.getElementById("comments-container");
     if (dialogCommentsContainer) {
         // 清空之前的内容
-        if (!isCommentsScrolling) {
+        if (!isCommentsScrolling && isInitialCollection) {
             dialogCommentsContainer.innerHTML = "";
         }
 
         // 显示评论
         displayComments(comments, dialogCommentsContainer);
 
-        // 更新状态
-        updateCommentCollectorStatus(`已收集 ${processedIds.size} 条评论`);
+        // 更新状态信息（包括主贴中的总数信息）
+        const collectedCount = allCommentsData.filter(comment => !comment.isMainPost).length; // 使用非主贴评论的数量
+        let statusMessage = '';
+        
+        if (totalExpectedComments > 0) {
+            const progressInfo = totalExpectedComments ? 
+                ` (${Math.round((collectedCount / totalExpectedComments) * 100)}%)` : "";
+            statusMessage = `已收集 ${collectedCount}/${totalExpectedComments} 条评论${progressInfo}`;
+        } else {
+            statusMessage = `已收集 ${collectedCount} 条评论`;
+        }
+        
+        updateCommentCollectorStatus(statusMessage);
+        
+        // 更新评论统计数据
+        updateCommentStats(
+            collectedCount,
+            Math.floor((Date.now() - commentCollectionStartTime) / 1000),
+            earliestCommentTime || '未知'
+        );
     }
+    
+    return comments;
 }
 
 // 提取评论数据
@@ -1196,40 +1317,103 @@ function displayComments(comments, container) {
     comments.forEach(comment => {
         const commentDiv = document.createElement('div');
         commentDiv.className = 'collected-comment';
-        commentDiv.style.padding = '10px';
+        commentDiv.style.padding = '15px';
         commentDiv.style.borderBottom = '1px solid #eee';
-        commentDiv.style.marginBottom = '8px';
-        commentDiv.style.borderRadius = '4px';
-        commentDiv.style.backgroundColor = getColorForSpeaker(comment.speaker, speakerColors);
-
-        let html = `
-            <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-weight: bold;">${comment.speaker}</span>
-                <span style="color: #666; font-size: 12px;">${comment.publishTime}</span>
-            </div>
-        `;
-
-        if (comment.quote) {
-            html += `
-                <div style="background-color: rgba(0,0,0,0.05); padding: 8px; border-left: 3px solid #ccc; margin-bottom: 8px; font-size: 12px; color: #666; border-radius: 3px;">
-                    ${comment.quote.person}：${comment.quote.content}
-                </div>
-            `;
+        commentDiv.style.marginBottom = '12px';
+        commentDiv.style.borderRadius = '6px';
+        commentDiv.style.transition = 'all 0.2s ease';
+        
+        // 为主贴设置特殊样式
+        if (comment.isMainPost) {
+            commentDiv.classList.add('is-main-post');
+            commentDiv.style.backgroundColor = '#f9f9f9';
+        } else {
+            commentDiv.style.backgroundColor = getColorForSpeaker(comment.speaker, speakerColors);
         }
 
-        html += `<div style="line-height: 1.5;">${comment.content}</div>`;
+        let html = '';
+        
+        // 特殊处理主贴
+        if (comment.isMainPost) {
+            html += `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <div style="display: flex; align-items: center;">
+                        <span style="font-size: 18px; font-weight: bold; color: #1a1a1a;">#${comment.id}</span>
+                        <span class="main-post-label">树洞主贴</span>
+                    </div>
+                    <span style="color: #666; font-size: 13px;">${comment.publishTime}</span>
+                </div>
+                
+                <div style="font-size: 16px; line-height: 1.6; margin-bottom: 18px; color: #333; font-weight: 500;">${comment.content}</div>
+                
+                <div class="main-post-stats">
+                    <div class="main-post-stat-item">
+                        <div class="main-post-stat-icon" style="color: #ff9800;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;">
+                                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+                            </svg>
+                        </div>
+                        <span style="font-weight: 500; color: #555;">${comment.stars || 0} 收藏</span>
+                    </div>
+                    <div class="main-post-stat-item">
+                        <div class="main-post-stat-icon" style="color: #2196f3;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;">
+                                <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+                            </svg>
+                        </div>
+                        <span style="font-weight: 500; color: #555;">${comment.comments || 0} 评论</span>
+                    </div>
+                </div>
+            `;
+        } else {
+            // 普通评论的原有显示逻辑
+            html += `
+                <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: bold;">${comment.speaker}</span>
+                    <span style="color: #666; font-size: 12px;">${comment.publishTime}</span>
+                </div>
+            `;
+
+            if (comment.quote) {
+                html += `
+                    <div style="background-color: rgba(0,0,0,0.05); padding: 8px; border-left: 3px solid #ccc; margin-bottom: 8px; font-size: 12px; color: #666; border-radius: 3px;">
+                        ${comment.quote.person}：${comment.quote.content}
+                    </div>
+                `;
+            }
+
+            html += `<div style="line-height: 1.5;">${comment.content}</div>`;
+        }
 
         // 添加图片显示（如果存在）
         if (comment.images && comment.images.length > 0) {
-            html += '<div class="comment-images">';
+            html += `<div class="comment-images" style="${comment.isMainPost ? 'margin-top: 15px;' : 'margin-top: 10px;'}">`;
             comment.images.forEach(imgSrc => {
-                html += `<img src="${imgSrc}" style="max-width: 100%; margin: 10px 0; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);" />`;
+                html += `<img src="${imgSrc}" 
+                    style="max-width: 100%; 
+                    margin: 10px 0; 
+                    border-radius: 6px; 
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+                    ${comment.isMainPost ? 'max-height: 400px; object-fit: contain;' : ''}" />`;
             });
             html += '</div>';
         }
 
         commentDiv.innerHTML = html;
         container.appendChild(commentDiv);
+        
+        // 为主贴添加渐入动画效果
+        if (comment.isMainPost) {
+            setTimeout(() => {
+                commentDiv.style.transform = 'translateY(-3px)';
+                commentDiv.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
+            }, 100);
+            
+            setTimeout(() => {
+                commentDiv.style.transform = 'translateY(0)';
+                commentDiv.style.boxShadow = '0 2px 10px rgba(0,0,0,0.08)';
+            }, 500);
+        }
     });
 }
 
@@ -1296,6 +1480,40 @@ function addCommentCollectorStyles() {
         .comment-images img:hover {
             transform: scale(1.02);
             box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+        }
+        .collected-comment.is-main-post {
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            border: 1px solid #e0e0e0;
+            transition: all 0.3s ease;
+        }
+        .collected-comment.is-main-post:hover {
+            box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+        }
+        .main-post-label {
+            background-color: #e0e0e0;
+            color: #555;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+        .main-post-stats {
+            display: flex;
+            margin-top: 15px;
+            background-color: rgba(0,0,0,0.03);
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .main-post-stat-item {
+            display: flex;
+            align-items: center;
+            margin-right: 20px;
+        }
+        .main-post-stat-icon {
+            margin-right: 5px;
         }
     `;
     document.head.appendChild(style);
@@ -1441,6 +1659,12 @@ function startCollectComments() {
         exportControls.style.display = 'none';
     }
 
+    // 显示统计信息区域
+    const commentStats = document.getElementById('comment-stats');
+    if (commentStats) {
+        commentStats.style.display = 'block';
+    }
+
     // 重置统计信息
     updateCommentStats(0, 0, '-');
 
@@ -1494,6 +1718,12 @@ function stopCollectComments() {
     if (exportControls) {
         exportControls.style.display = 'block';
     }
+    
+    // 确保统计信息区域也显示
+    const commentStats = document.getElementById('comment-stats');
+    if (commentStats) {
+        commentStats.style.display = 'block';
+    }
 
     // 更新筛选下拉框
     updateSpeakerFilter();
@@ -1507,101 +1737,15 @@ function stopCollectComments() {
         speakerFilter.addEventListener('change', filterAndDisplayComments);
     }
 
-    updateCommentCollectorStatus(`收集完成，共 ${collectedCommentIds.size} 条评论`);
-}
+    // 更新最终的评论数统计
+    const collectedCount = allCommentsData.filter(comment => !comment.isMainPost).length;
+    updateCommentStats(
+        collectedCount,
+        Math.floor((Date.now() - commentCollectionStartTime) / 1000),
+        earliestCommentTime || '未知'
+    );
 
-// 收集评论
-function collectComments(isInitialCollection = false) {
-    if (!isCollectingComments && !isInitialCollection) return;
-
-    // 获取评论容器
-    const commentsContainer = document.querySelector(".sidebar-content");
-    if (!commentsContainer) {
-        updateCommentCollectorStatus("无法找到评论容器", true);
-        stopCollectComments();
-        return;
-    }
-
-    // 获取所有评论元素
-    const commentElements = commentsContainer.querySelectorAll(".box:not(.box-tip):not(.box33)");
-    if (!commentElements || commentElements.length === 0) {
-        updateCommentCollectorStatus("未找到评论", true);
-        if (isInitialCollection) {
-            stopCollectComments();
-        }
-        return;
-    }
-
-    // 收集评论数据
-    const newComments = [];
-    let newCommentsCount = 0;
-
-    commentElements.forEach(element => {
-        // 提取评论ID
-        const idElement = element.querySelector(".box-id");
-        if (!idElement) return;
-
-        const commentId = idElement.textContent.trim();
-
-        // 跳过已处理的评论
-        if (collectedCommentIds.has(commentId)) return;
-
-        // 获取发布时间
-        const headerElement = element.querySelector(".box-header");
-        let publishTime = null;
-        if (headerElement) {
-            const timeText = headerElement.textContent.match(/(\d{2}-\d{2} \d{2}:\d{2})/);
-            if (timeText && timeText[1]) {
-                publishTime = timeText[1];
-
-                // 更新最早评论时间
-                if (!earliestCommentTime || publishTime < earliestCommentTime) {
-                    earliestCommentTime = publishTime;
-                }
-            }
-        }
-
-        // 提取评论数据
-        const commentData = extractCommentData(element);
-        if (commentData) {
-            // 添加评论ID和发布时间
-            commentData.id = commentId;
-            commentData.publishTime = publishTime;
-
-            // 添加到新评论列表
-            newComments.push(commentData);
-            collectedCommentIds.add(commentId);
-            newCommentsCount++;
-
-            // 将发言人添加到列表中
-            if (commentData.speaker) {
-                speakerList.add(commentData.speaker);
-            }
-
-            // 添加到全部评论数据中
-            allCommentsData.push(commentData);
-        }
-    });
-
-    // 显示收集到的评论
-    if (newCommentsCount > 0) {
-        const dialogCommentsContainer = document.getElementById("comments-container");
-        if (dialogCommentsContainer) {
-            // 清空现有评论并显示全部
-            dialogCommentsContainer.innerHTML = '';
-            displayComments(allCommentsData, dialogCommentsContainer);
-
-            // 更新统计信息
-            updateCommentStats(
-                collectedCommentIds.size,
-                Math.floor((Date.now() - commentCollectionStartTime) / 1000),
-                earliestCommentTime || '-'
-            );
-
-            // 更新状态
-            updateCommentCollectorStatus(`已收集 ${collectedCommentIds.size} 条评论`);
-        }
-    }
+    updateCommentCollectorStatus(`收集完成，共 ${collectedCount} 条评论`);
 }
 
 // 更新评论统计信息
@@ -1609,8 +1753,15 @@ function updateCommentStats(count, timeInSeconds, earliestTime) {
     const countElement = document.getElementById('comment-count');
     const timeElement = document.getElementById('collection-time');
     const earliestTimeElement = document.getElementById('earliest-comment-time');
+    
+    // 计算进度百分比
+    let progressPercentage = '';
+    if (totalExpectedComments > 0) {
+        const percentage = Math.round((count / totalExpectedComments) * 100);
+        progressPercentage = ` (${percentage}%)`;
+    }
 
-    if (countElement) countElement.textContent = count;
+    if (countElement) countElement.textContent = `${count}${progressPercentage}`;
     if (timeElement) timeElement.textContent = formatTime(timeInSeconds);
     if (earliestTimeElement) earliestTimeElement.textContent = earliestTime;
 }
@@ -1641,60 +1792,83 @@ function formatTime(seconds) {
 
 // 更新评论筛选下拉框
 function updateSpeakerFilter() {
+    // 获取所有唯一的发言者
+    const speakers = new Set();
+    
+    // 保存当前选中的值
     const speakerFilter = document.getElementById('speaker-filter');
-    if (!speakerFilter) return;
-
-    // 保存当前选择
-    const currentSelection = speakerFilter.value;
-
-    // 清空现有选项，只保留"全部评论"
-    while (speakerFilter.options.length > 1) {
-        speakerFilter.remove(1);
-    }
-
-    // 添加所有发言人作为选项
-    speakerList.forEach(speaker => {
-        const option = document.createElement('option');
-        option.value = speaker;
-        option.textContent = speaker;
-        speakerFilter.appendChild(option);
-    });
-
-    // 恢复之前的选择（如果存在于新列表中）
-    if (currentSelection && speakerList.has(currentSelection)) {
-        speakerFilter.value = currentSelection;
+    const selectedValue = speakerFilter ? speakerFilter.value : 'all';
+    
+    // 清空下拉框
+    if (speakerFilter) {
+        speakerFilter.innerHTML = '';
+        
+        // 添加"全部"选项
+        const allOption = document.createElement('option');
+        allOption.value = 'all';
+        
+        // 使用非主贴评论的数量
+        const nonMainPostComments = allCommentsData.filter(comment => !comment.isMainPost);
+        allOption.textContent = `全部 (${nonMainPostComments.length}条)`;
+        speakerFilter.appendChild(allOption);
+        
+        // 遍历评论获取发言者，排除主贴
+        allCommentsData.forEach(comment => {
+            if (!comment.isMainPost && comment.speaker && !speakers.has(comment.speaker)) {
+                speakers.add(comment.speaker);
+            }
+        });
+        
+        // 为每个发言者创建一个选项
+        speakers.forEach(speaker => {
+            const option = document.createElement('option');
+            option.value = speaker;
+            
+            // 计算该发言者的评论数，排除主贴
+            const speakerCommentCount = allCommentsData.filter(comment => 
+                !comment.isMainPost && comment.speaker === speaker).length;
+            
+            option.textContent = `${speaker} (${speakerCommentCount}条)`;
+            speakerFilter.appendChild(option);
+        });
+        
+        // 恢复选中的值
+        speakerFilter.value = selectedValue;
     }
 }
 
 // 筛选并显示评论
 function filterAndDisplayComments() {
+    // 获取筛选条件
     const speakerFilter = document.getElementById('speaker-filter');
-    const selectedSpeaker = speakerFilter ? speakerFilter.value : '';
-    const commentsContainer = document.getElementById('comments-container');
+    const selectedSpeaker = speakerFilter ? speakerFilter.value : 'all';
+    
+    // 查找主贴
+    const mainPost = allCommentsData.find(comment => comment.isMainPost);
 
-    if (!commentsContainer) return;
-
-    // 筛选评论
-    let filteredComments = allCommentsData;
-    if (selectedSpeaker) {
-        filteredComments = allCommentsData.filter(comment => comment.speaker === selectedSpeaker);
+    // 筛选评论（不包括主贴）
+    let filteredComments = allCommentsData.filter(comment => !comment.isMainPost);
+    
+    // 根据发言者筛选普通评论
+    if (selectedSpeaker !== 'all') {
+        filteredComments = filteredComments.filter(comment => 
+            comment.speaker === selectedSpeaker);
     }
-
+    
+    // 如果找到主贴，将其添加到筛选结果的开头
+    if (mainPost) {
+        filteredComments = [mainPost, ...filteredComments];
+    }
+    
     // 显示筛选后的评论
-    commentsContainer.innerHTML = ''; // 清空容器
-
-    if (filteredComments.length === 0) {
-        commentsContainer.innerHTML = '<div style="padding: 10px; text-align: center; color: #666;">没有找到符合条件的评论</div>';
-        return;
-    }
-
-    displayComments(filteredComments, commentsContainer);
-
-    // 更新状态信息
-    if (selectedSpeaker) {
-        updateCommentCollectorStatus(`显示 ${selectedSpeaker} 的 ${filteredComments.length} 条评论（共收集 ${allCommentsData.length} 条）`);
-    } else {
-        updateCommentCollectorStatus(`显示全部 ${allCommentsData.length} 条评论`);
+    const commentsContainer = document.getElementById('comments-container');
+    if (commentsContainer) {
+        commentsContainer.innerHTML = '';  // 清空容器
+        displayComments(filteredComments, commentsContainer);
+        
+        // 更新评论数显示 (主贴不计入评论数)
+        const nonMainPostCount = filteredComments.filter(comment => !comment.isMainPost).length;
+        updateCommentCollectorStatus(`已筛选 ${nonMainPostCount} 条评论`);
     }
 }
 
@@ -1702,66 +1876,79 @@ function filterAndDisplayComments() {
 function exportAsText() {
     // 获取当前显示的评论
     const speakerFilter = document.getElementById('speaker-filter');
-    const selectedSpeaker = speakerFilter ? speakerFilter.value : '';
+    const selectedSpeaker = speakerFilter ? speakerFilter.value : 'all';
+    
+    // 查找主贴
+    const mainPost = allCommentsData.find(comment => comment.isMainPost);
 
-    // 筛选评论
-    let comments = allCommentsData;
-    if (selectedSpeaker) {
-        comments = allCommentsData.filter(comment => comment.speaker === selectedSpeaker);
+    // 筛选评论，排除主贴
+    let comments = allCommentsData.filter(comment => !comment.isMainPost);
+    
+    if (selectedSpeaker !== 'all') {
+        comments = comments.filter(comment => comment.speaker === selectedSpeaker);
     }
-
-    if (comments.length === 0) {
+    
+    if (comments.length === 0 && !mainPost) {
         alert('没有可导出的评论');
         return;
     }
-
+    
     // 生成帖子信息
     const holeTitle = document.querySelector('.sidebar-title.sidebar-top');
     const holeTitleMatch = holeTitle ? holeTitle.textContent.match(/#\d+/) : null;
     const holeId = holeTitleMatch ? holeTitleMatch[0] : (holeTitle ? holeTitle.textContent.trim() : '未知帖子');
-    const totalFollows = comments[0].follows || 0;
-    const totalComments = comments.length;
+    const totalComments = comments.length; // 不包含主贴的评论数
     const exportTime = new Date().toLocaleString();
-
+    
     // 生成文本内容
     let textContent = `# ${holeId}\n`;
     textContent += `# 导出时间：${exportTime}\n`;
     textContent += `# 评论数量：${totalComments}\n`;
-    if (selectedSpeaker) {
+    if (selectedSpeaker !== 'all') {
         textContent += `# 筛选条件：只看 ${selectedSpeaker}\n`;
     }
     textContent += `# 最早评论时间：${earliestCommentTime || '未知'}\n`;
     textContent += `\n-------------------------------\n\n`;
-
+    
+    // 先添加主贴信息(如果有)
+    if (mainPost) {
+        textContent += `【主贴】ID: ${mainPost.id} | 时间: ${mainPost.publishTime || '未知'}\n\n`;
+        textContent += `${mainPost.content || ''}\n\n`;
+        if (mainPost.stars || mainPost.comments) {
+            textContent += `收藏: ${mainPost.stars || 0} | 评论: ${mainPost.comments || 0}\n\n`;
+        }
+        textContent += `-------------------------------\n\n`;
+    }
+    
     // 添加每条评论
     comments.forEach((comment, index) => {
         // 评论ID和发言人信息
         textContent += `[${index + 1}] ID: ${comment.id || ''} | 发言人: ${comment.speaker || '匿名'}`;
-
+        
         // 添加发布时间
         if (comment.publishTime) {
             textContent += ` | 时间: ${comment.publishTime}`;
         }
         textContent += `\n\n`;
-
+        
         // 如果有引用内容，先显示引用
         if (comment.quote) {
             textContent += `【引用】${comment.quote.person || '匿名'}: ${comment.quote.content}\n\n`;
         }
-
+        
         // 添加评论主体内容
         textContent += `${comment.content || ''}\n\n`;
-
+        
         textContent += `-------------------------------\n\n`;
     });
-
+    
     // 创建下载链接
     const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-
+    
     // 设置文件名
-    const fileName = `TreeHole${holeId}_${new Date().getTime()}.txt`;
-
+    const fileName = `TreeHole${holeId.replace('#', '')}_${new Date().getTime()}.txt`;
+    
     // 创建并触发下载
     const a = document.createElement('a');
     a.href = url;
@@ -1769,13 +1956,13 @@ function exportAsText() {
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-
+    
     // 清理资源
     setTimeout(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }, 100);
-
+    
     updateCommentCollectorStatus(`已导出 ${totalComments} 条评论为文本文件`);
 }
 
@@ -2209,5 +2396,84 @@ function getSortMethodName(method) {
         case 'reply': return '按评论数排序';
         case 'time': return '按发布时间排序';
         default: return '未知排序方式';
+    }
+}
+
+// 在文件末尾添加主贴相关函数
+// 新增：专门处理第一条帖子（树洞主贴）的函数
+function extractMainPostData(postElement) {
+    try {
+        // 获取帖子ID
+        const idElement = postElement.querySelector('.box-id');
+        const id = idElement ? idElement.textContent.trim().replace('#', '') : '';
+
+        // 获取帖子内容
+        const contentElement = postElement.querySelector('.box-content');
+        if (!contentElement) return null;
+        
+        // 获取主贴内容文本
+        const content = contentElement.innerText.trim();
+        
+        // 提取收藏数和评论数
+        const headerElement = postElement.querySelector('.box-header');
+        let stars = 0;
+        let comments = 0;
+        let publishTime = '';
+        
+        if (headerElement) {
+            // 提取收藏数 (检查两种可能的图标类名)
+            const starBadge = headerElement.querySelector('.box-header-badge .icon-star-ok') || 
+                            headerElement.querySelector('.box-header-badge .icon-star');
+            
+            if (starBadge && starBadge.parentElement) {
+                const starText = starBadge.parentElement.textContent.trim();
+                stars = parseInt(starText) || 0;
+            }
+            
+            // 提取评论数 (可能不存在)
+            const replyBadge = headerElement.querySelector('.box-header-badge .icon-reply');
+            if (replyBadge && replyBadge.parentElement) {
+                const replyText = replyBadge.parentElement.textContent.trim();
+                comments = parseInt(replyText) || 0;
+            }
+            
+            // 提取发布时间 (格式：刚刚&nbsp;03-04 21:35 或 2分钟前&nbsp;03-04 21:35)
+            // 我们优先使用日期部分 (xx-xx xx:xx)
+            const dateTimeMatch = headerElement.textContent.match(/(\d{2}-\d{2} \d{2}:\d{2})/);
+            if (dateTimeMatch) {
+                publishTime = dateTimeMatch[1];
+            } else {
+                // 如果没有匹配到日期格式，尝试提取整个时间信息
+                const timeText = headerElement.textContent.trim().split('        ')[1];
+                if (timeText) {
+                    publishTime = timeText.trim();
+                }
+            }
+        }
+        
+        // 提取图片元素
+        const images = [];
+        const imgElements = contentElement.querySelectorAll('img');
+        imgElements.forEach(img => {
+            if (img.src) {
+                images.push(img.src);
+            }
+        });
+        
+        console.log('提取主贴数据:', { id, stars, comments, publishTime });
+        
+        return {
+            id,
+            speaker: '洞主',  // 主贴发言人一定是洞主
+            content,
+            publishTime: publishTime || '',
+            images,
+            isMainPost: true,  // 标记为主贴
+            stars,            // 收藏数
+            comments          // 评论数
+        };
+    } catch (error) {
+        console.error('[PKU TreeHole] 提取主贴数据出错:', error);
+        return null;
     }
 }
