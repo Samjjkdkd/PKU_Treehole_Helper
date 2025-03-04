@@ -2,110 +2,182 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <title>PKU TreeHole Helper</title>
     <style>
         body {
-            width: 400px;
-            padding: 10px;
-            font-family: Arial, sans-serif;
+            width: 360px;
+            font-family: 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #333;
         }
-        .config-panel {
+        
+        .container {
+            padding: 15px;
+        }
+        
+        h1 {
+            font-size: 18px;
+            margin-top: 0;
+            color: #1a73e8;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        h2 {
+            font-size: 16px;
+            margin-top: 15px;
+            margin-bottom: 10px;
+            color: #444;
+        }
+        
+        p {
+            font-size: 14px;
+            line-height: 1.5;
+            margin: 10px 0;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            background-color: #f5f5f5;
+        }
+        
+        .tab {
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            text-align: center;
+            flex: 1;
+        }
+        
+        .tab.active {
+            background-color: white;
+            border-bottom: 2px solid #1a73e8;
+            color: #1a73e8;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 15px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .setting-item {
             margin-bottom: 15px;
-            padding: 10px;
-            background: #f5f5f5;
+        }
+        
+        .setting-label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
             border-radius: 4px;
+            font-size: 14px;
+            background-color: white;
         }
-        .config-item {
-            margin: 8px 0;
-        }
-        label {
-            display: inline-block;
-            width: 120px;
-        }
-        input[type="number"] {
-            width: 80px;
-            padding: 4px;
-        }
-        #start-btn, #stop-btn {
-            background-color: #4CAF50;
+        
+        button {
+            background-color: #1a73e8;
             color: white;
-            padding: 8px 16px;
             border: none;
+            padding: 8px 12px;
             border-radius: 4px;
             cursor: pointer;
-            margin-right: 10px;
+            font-size: 14px;
         }
-        #stop-btn {
-            background-color: #f44336;
-            display: none;
+        
+        button:hover {
+            background-color: #1557b0;
         }
-        .button-group {
+        
+        .feature {
             margin-bottom: 10px;
+            border-left: 3px solid #1a73e8;
+            padding-left: 10px;
         }
-        .hole-item {
-            border: 1px solid #ddd;
-            margin: 5px 0;
+        
+        .feature-title {
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+        
+        .success-message {
+            background-color: #e8f5e9;
             padding: 10px;
             border-radius: 4px;
-        }
-        .hole-id {
-            color: #1a73e8;
-            font-weight: bold;
-        }
-        .like-count {
-            color: #e91e63;
-            font-weight: bold;
-        }
-        .content {
-            margin-top: 5px;
-            color: #333;
-            word-break: break-all;
-        }
-        #holes-container {
-            max-height: 500px;
-            overflow-y: auto;
-        }
-        .loading {
-            text-align: center;
-            color: #666;
-        }
-        .status {
             margin-top: 10px;
-            padding: 5px;
-            background: #e8f5e9;
-            border-radius: 4px;
+            color: #1b5e20;
             display: none;
-        }
-        .instruction {
-            margin: 10px 0;
-            padding: 8px;
-            background-color: #fff3cd;
-            border-radius: 4px;
-            color: #856404;
         }
     </style>
 </head>
 <body>
-    <div class="instruction">
-        使用说明：点击"开始收集数据"后，插件会<strong>自动滚动页面</strong>加载帖子，并收集排序展示收藏数据。
+    <div class="tabs">
+        <div class="tab active" data-tab="tutorial">使用教程</div>
+        <div class="tab" data-tab="settings">设置</div>
+        <div class="tab" data-tab="about">关于</div>
     </div>
-    <div class="config-panel">
-        <div class="config-item">
-            <label>最大收集时间(分钟):</label>
-            <input type="number" id="time-limit" value="5" min="1" max="60">
+    
+    <div class="tab-content active" id="tutorial">
+        <h1>PKU TreeHole Helper 使用教程</h1>
+        
+        <div class="feature">
+            <div class="feature-title">树洞收藏统计</div>
+            <p>在树洞首页，点击右侧的悬浮按钮，可以对当前页面的树洞进行收藏数和评论数的统计。
+                勾选自动滚动复选框，会使页面自动滚动并收集帖子。另外支持通过滚动时间、爬取数量和时间范围设置来限制爬取范围。</p>
         </div>
-        <div class="config-item">
-            <label>最大帖子数量:</label>
-            <input type="number" id="posts-limit" value="3000" min="10" max="10000">
+        
+        <div class="feature">
+            <div class="feature-title">树洞评论收集</div>
+            <p>在树洞详情页面，点击上方标题旁的绿色小树图标，可以收集当前树洞的所有评论。勾选自动滚动复选框，会使页面自动滚动并收集评论。</p>
+        </div>
+        
+        <div class="feature">
+            <div class="feature-title">数据导出</div>
+            <p>收集的数据可以导出为文本或图片格式，并可以同时复制到剪贴板（可在设置中配置）。图片导出会限制显示条数，避免文件过大。</p>
+        </div>
+        
+        <div class="feature">
+            <div class="feature-title">评论筛选</div>
+            <p>在评论收集完成后，可以使用"只看"下拉框按发言人筛选评论，方便查看特定用户的发言。</p>
         </div>
     </div>
-    <div class="button-group">
-        <button id="start-btn">开始收集数据</button>
-        <button id="stop-btn">停止收集</button>
+    
+    <div class="tab-content" id="settings">
+        <h1>设置</h1>
+        
+        <div class="setting-item">
+            <label class="setting-label" for="export-mode">导出方式设置：</label>
+            <select id="export-mode">
+                <option value="save">仅保存到本地</option>
+                <option value="copy">仅复制到剪贴板</option>
+                <option value="both">保存到本地并复制到剪贴板</option>
+            </select>
+        </div>
+        
+        <button id="save-settings">保存设置</button>
+        <div id="save-success" class="success-message">设置已保存</div>
     </div>
-    <div class="status" id="status-text"></div>
-    <div id="holes-container">
-        <div class="loading" style="display: none;">正在收集数据...</div>
+    
+    <div class="tab-content" id="about">
+        <h1>关于</h1>
+        <p>PKU TreeHole Helper 是一个帮助北大树洞用户更方便地使用树洞的浏览器扩展。</p>
+        <p>版本: 1.0</p>
+        <p>本扩展完全在本地运行，不会将您的数据发送到任何服务器。</p>
+        <p>如有问题或建议，请联系开发者。</p>
+        <p>qq：985991388，微信/电话：18610806076</p>
     </div>
+    
     <script src="popup.js"></script>
 </body>
 </html> 

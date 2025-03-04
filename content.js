@@ -2043,28 +2043,64 @@ function exportAsText() {
         textContent += `-------------------------------\n\n`;
     });
     
-    // 创建下载链接
-    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    
-    // 设置文件名
-    const fileName = `TreeHole${holeId.replace('#', '')}_${new Date().getTime()}.txt`;
-    
-    // 创建并触发下载
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    
-    // 清理资源
-    setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }, 100);
-    
-    updateCommentCollectorStatus(`已导出 ${totalComments} 条评论为文本文件`);
+    // 获取导出设置并执行导出
+    getExportSettings().then(exportMode => {
+        let saveToLocal = exportMode === 'save' || exportMode === 'both';
+        let copyToClipboard = exportMode === 'copy' || exportMode === 'both';
+        
+        // 根据设置保存到本地
+        if (saveToLocal) {
+            // 创建下载链接
+            const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            
+            // 设置文件名
+            const fileName = `TreeHole${holeId.replace('#', '')}_${new Date().getTime()}.txt`;
+            
+            // 创建并触发下载
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            
+            // 清理资源
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+        }
+        
+        // 根据设置复制到剪贴板
+        if (copyToClipboard) {
+            try {
+                navigator.clipboard.writeText(textContent).then(() => {
+                    if (saveToLocal) {
+                        updateCommentCollectorStatus(`已导出 ${totalComments} 条评论为文本文件，并已复制到剪贴板`);
+                    } else {
+                        updateCommentCollectorStatus(`已复制 ${totalComments} 条评论到剪贴板`);
+                    }
+                }).catch(err => {
+                    console.error('无法复制到剪贴板: ', err);
+                    if (saveToLocal) {
+                        updateCommentCollectorStatus(`已导出 ${totalComments} 条评论为文本文件（复制到剪贴板失败）`);
+                    } else {
+                        updateCommentCollectorStatus(`复制到剪贴板失败`);
+                    }
+                });
+            } catch (err) {
+                console.error('不支持clipboard API: ', err);
+                if (saveToLocal) {
+                    updateCommentCollectorStatus(`已导出 ${totalComments} 条评论为文本文件`);
+                } else {
+                    updateCommentCollectorStatus(`复制到剪贴板失败（不支持clipboard API）`);
+                }
+            }
+        } else {
+            updateCommentCollectorStatus(`已导出 ${totalComments} 条评论为文本文件`);
+        }
+    });
 }
 
 // 导出为图片格式
@@ -2168,27 +2204,65 @@ function exportAsImage() {
             // 移除临时容器
             document.body.removeChild(tempContainer);
 
-            // 转换为图片URL
-            const imageUrl = canvas.toDataURL('image/png');
-
-            // 设置文件名
-            const fileName = `TreeHole${holeId}_${new Date().getTime()}.png`;
-
-            // 创建并触发下载
-            const a = document.createElement('a');
-            a.href = imageUrl;
-            a.download = fileName;
-            a.style.display = 'none';
-            document.body.appendChild(a);
-            a.click();
-
-            // 清理资源
-            setTimeout(() => {
-                document.body.removeChild(a);
-            }, 100);
-
-            updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条帖子数据为图片文件
-                ${totalFilteredComments > MAX_COMMENTS_TO_DISPLAY ? '（仅展示前100条）' : ''}`);
+            // 获取导出设置并执行导出
+            getExportSettings().then(exportMode => {
+                let saveToLocal = exportMode === 'save' || exportMode === 'both';
+                let copyToClipboard = exportMode === 'copy' || exportMode === 'both';
+                
+                // 将canvas转换为图片数据
+                const imgData = canvas.toDataURL('image/png');
+                
+                // 根据设置保存到本地
+                if (saveToLocal) {
+                    // 设置文件名
+                    const link = document.createElement('a');
+                    link.href = imgData;
+                    link.download = `PKU_TreeHole_导出_${new Date().getTime()}.png`;
+                    link.click();
+                }
+                
+                // 根据设置复制到剪贴板
+                if (copyToClipboard) {
+                    try {
+                        // 在某些浏览器中，可以直接从canvas获取剪贴板项
+                        canvas.toBlob(blob => {
+                            try {
+                                const item = new ClipboardItem({ 'image/png': blob });
+                                navigator.clipboard.write([item]).then(() => {
+                                    if (saveToLocal) {
+                                        updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}，并已复制到剪贴板`);
+                                    } else {
+                                        updateGlobalStatus(`已复制 ${displayHoles.length} 条帖子数据为图片${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}到剪贴板`);
+                                    }
+                                }).catch(err => {
+                                    console.error('无法复制图片到剪贴板: ', err);
+                                    if (saveToLocal) {
+                                        updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}（复制到剪贴板失败）`);
+                                    } else {
+                                        updateGlobalStatus(`复制帖子数据图片到剪贴板失败`);
+                                    }
+                                });
+                            } catch (err) {
+                                console.error('ClipboardItem不受支持: ', err);
+                                if (saveToLocal) {
+                                    updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+                                } else {
+                                    updateGlobalStatus(`复制到剪贴板失败（ClipboardItem不受支持）`);
+                                }
+                            }
+                        });
+                    } catch (err) {
+                        console.error('无法使用剪贴板功能: ', err);
+                        if (saveToLocal) {
+                            updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+                        } else {
+                            updateGlobalStatus(`复制到剪贴板失败（无法使用剪贴板功能）`);
+                        }
+                    }
+                } else {
+                    updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+                }
+            });
         })
         .catch(error => {
             console.error('导出图片失败:', error);
@@ -2373,28 +2447,64 @@ function exportHolesAsText() {
         textContent += `-------------------------------\n\n`;
     });
 
-    // 创建下载链接
-    const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-
-    // 设置文件名
-    const fileName = `PKU_TreeHole_导出_${new Date().getTime()}.txt`;
-
-    // 创建并触发下载
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-
-    // 清理资源
-    setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }, 100);
-
-    updateGlobalStatus(`已导出 ${sortedHoles.length} 条帖子数据为文本文件`);
+    // 获取导出设置并执行导出
+    getExportSettings().then(exportMode => {
+        let saveToLocal = exportMode === 'save' || exportMode === 'both';
+        let copyToClipboard = exportMode === 'copy' || exportMode === 'both';
+        
+        // 根据设置保存到本地
+        if (saveToLocal) {
+            // 创建下载链接
+            const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            
+            // 设置文件名
+            const fileName = `PKU_TreeHole_导出_${new Date().getTime()}.txt`;
+            
+            // 创建并触发下载
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            
+            // 清理资源
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+        }
+        
+        // 根据设置复制到剪贴板
+        if (copyToClipboard) {
+            try {
+                navigator.clipboard.writeText(textContent).then(() => {
+                    if (saveToLocal) {
+                        updateGlobalStatus(`已导出 ${sortedHoles.length} 条帖子数据为文本文件，并已复制到剪贴板`);
+                    } else {
+                        updateGlobalStatus(`已复制 ${sortedHoles.length} 条帖子数据到剪贴板`);
+                    }
+                }).catch(err => {
+                    console.error('无法复制到剪贴板: ', err);
+                    if (saveToLocal) {
+                        updateGlobalStatus(`已导出 ${sortedHoles.length} 条帖子数据为文本文件（复制到剪贴板失败）`);
+                    } else {
+                        updateGlobalStatus(`复制到剪贴板失败`);
+                    }
+                });
+            } catch (err) {
+                console.error('不支持clipboard API: ', err);
+                if (saveToLocal) {
+                    updateGlobalStatus(`已导出 ${sortedHoles.length} 条帖子数据为文本文件`);
+                } else {
+                    updateGlobalStatus(`复制到剪贴板失败（不支持clipboard API）`);
+                }
+            }
+        } else {
+            updateGlobalStatus(`已导出 ${sortedHoles.length} 条帖子数据为文本文件`);
+        }
+    });
 }
 
 // 导出悬浮窗中的树洞数据为图片格式
@@ -2507,7 +2617,27 @@ function exportHolesAsImage() {
             link.download = `PKU_TreeHole_导出_${new Date().getTime()}.png`;
             link.click();
 
-            updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+            // 尝试将图片复制到剪贴板
+            try {
+                // 在某些浏览器中，可以直接从canvas获取剪贴板项
+                canvas.toBlob(blob => {
+                    try {
+                        const item = new ClipboardItem({ 'image/png': blob });
+                        navigator.clipboard.write([item]).then(() => {
+                            updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}，并已复制到剪贴板`);
+                        }).catch(err => {
+                            console.error('无法复制图片到剪贴板: ', err);
+                            updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}（复制到剪贴板失败）`);
+                        });
+                    } catch (err) {
+                        console.error('ClipboardItem不受支持: ', err);
+                        updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+                    }
+                });
+            } catch (err) {
+                console.error('无法使用剪贴板功能: ', err);
+                updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+            }
         })
         .catch(error => {
             // 确保在出错时也移除临时容器
@@ -2606,5 +2736,22 @@ function extractMainPostData(postElement) {
         console.error('[PKU TreeHole] 提取主贴数据出错:', error);
         return null;
     }
+}
+
+// 获取导出设置
+function getExportSettings() {
+  return new Promise((resolve) => {
+    if (typeof chrome !== 'undefined' && chrome.storage) {
+      chrome.storage.sync.get({
+        // 默认值
+        exportMode: 'both'
+      }, function(items) {
+        resolve(items.exportMode);
+      });
+    } else {
+      // 如果无法访问chrome.storage，使用默认值
+      resolve('both');
+    }
+  });
 }
 
