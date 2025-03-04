@@ -1189,6 +1189,17 @@ function collectComments(isInitialCollection = false) {
             Math.floor((Date.now() - commentCollectionStartTime) / 1000),
             latestCommentTime || '未知'
         );
+        
+        // 检查进度是否到达100%，如果是则自动停止收集
+        if (totalExpectedComments > 0 && collectedCount >= totalExpectedComments) {
+            updateCommentCollectorStatus("已收集全部评论，自动停止收集");
+            // 使用setTimeout来避免在collectComments函数执行过程中直接调用stopCollectComments
+            setTimeout(() => {
+                if (isCollectingComments) {
+                    stopCollectComments();
+                }
+            }, 500);
+        }
     }
     
     return comments;
@@ -1578,6 +1589,17 @@ function startCommentsAutoScroll() {
         const currentCommentCount = collectedCommentIds.size;
         const isAtBottom = isScrolledToBottom(scrollContainer);
 
+        // 检查进度是否达到100%
+        const nonMainPostCount = allCommentsData.filter(comment => !comment.isMainPost).length;
+        const progressReached100 = totalExpectedComments > 0 && nonMainPostCount >= totalExpectedComments;
+        
+        // 如果进度达到100%，停止滚动和收集
+        if (progressReached100) {
+            updateCommentCollectorStatus("已收集全部评论，自动停止收集");
+            stopCollectComments(); // 停止收集评论（也会停止滚动）
+            return;
+        }
+
         if (isAtBottom) {
             // 如果评论数量与上次相同，累加稳定计数
             if (currentCommentCount === lastCommentCount) {
@@ -1682,6 +1704,18 @@ function startCollectComments() {
     // 开始收集
     updateCommentCollectorStatus('开始收集评论...');
     collectComments(true);
+    
+    // 立即检查是否已经收集完毕
+    const nonMainPostCount = allCommentsData.filter(comment => !comment.isMainPost).length;
+    if (totalExpectedComments > 0 && nonMainPostCount >= totalExpectedComments) {
+        updateCommentCollectorStatus("已收集全部评论，自动停止收集");
+        setTimeout(() => {
+            if (isCollectingComments) {
+                stopCollectComments();
+            }
+        }, 500);
+        return;
+    }
 
     // 设置计时器，定期更新用时
     commentCollectionTimer = setInterval(() => {
@@ -1689,10 +1723,61 @@ function startCollectComments() {
         updateCollectionTime(elapsedSeconds);
     }, 1000);
 
-    // 如果自动滚动选项已勾选，则开始自动滚动
+    // 检查自动滚动选项是否已勾选
     const autoScrollCheckbox = document.getElementById('auto-scroll-comments');
-    if (autoScrollCheckbox && autoScrollCheckbox.checked) {
+    const isAutoScrollEnabled = autoScrollCheckbox && autoScrollCheckbox.checked;
+
+    // 如果自动滚动选项已勾选，则开始自动滚动
+    if (isAutoScrollEnabled) {
         startCommentsAutoScroll();
+    } else {
+        // 如果没有启用自动滚动，添加评论数量检测计时器
+        // 用于检测评论数量是否在一段时间内无变化，如果是则停止收集
+        
+        // 保存上一次检查时的评论数量
+        let lastCommentCount = nonMainPostCount;
+        // 记录评论数量连续无变化的次数
+        let unchangedCount = 0;
+        // 连续无变化的阈值，达到此值时停止收集
+        const MAX_UNCHANGED_COUNT = 3; // 连续3次无变化后停止
+        
+        // 创建评论数量检测计时器
+        let noChangeDetectionTimer = setInterval(() => {
+            if (!isCollectingComments) {
+                clearInterval(noChangeDetectionTimer);
+                return;
+            }
+            
+            const currentCommentCount = allCommentsData.filter(comment => !comment.isMainPost).length;
+            
+            // 如果评论数量无变化
+            if (currentCommentCount === lastCommentCount) {
+                unchangedCount++;
+                
+                // 如果有预期总数且已达到，则立即停止
+                if (totalExpectedComments > 0 && currentCommentCount >= totalExpectedComments) {
+                    updateCommentCollectorStatus("已收集全部评论，自动停止收集");
+                    if (isCollectingComments) {
+                        stopCollectComments();
+                    }
+                    clearInterval(noChangeDetectionTimer);
+                } 
+                // 如果连续多次检测到评论数量无变化，且已经收集了一些评论，则停止收集
+                else if (currentCommentCount > 0 && unchangedCount >= MAX_UNCHANGED_COUNT) {
+                    updateCommentCollectorStatus(`评论数量 ${currentCommentCount} 在${MAX_UNCHANGED_COUNT}秒内无变化，停止收集`);
+                    if (isCollectingComments) {
+                        stopCollectComments();
+                    }
+                    clearInterval(noChangeDetectionTimer);
+                }
+            } else {
+                // 评论数量有变化，重置连续无变化计数
+                unchangedCount = 0;
+            }
+            
+            // 更新上一次检查的评论数量
+            lastCommentCount = currentCommentCount;
+        }, 600); // 每0.6秒检查一次
     }
 }
 
@@ -1707,6 +1792,10 @@ function stopCollectComments() {
         clearInterval(commentCollectionTimer);
         commentCollectionTimer = null;
     }
+
+    // 清除可能存在的其他计时器（通过名称检测和清除不可靠，此处只是注释说明）
+    // 所有计时器变量应在startCollectComments中创建时保存在闭包内，在这里不需要额外操作
+    // noChangeDetectionTimer会在其自己的逻辑中检测isCollectingComments并自动退出
 
     // 停止自动滚动（但不取消复选框勾选）
     stopCommentsAutoScroll(false);
@@ -2490,3 +2579,4 @@ function extractMainPostData(postElement) {
         return null;
     }
 }
+
