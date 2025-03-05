@@ -1205,6 +1205,84 @@ function collectComments(isInitialCollection = false) {
     return comments;
 }
 
+// 专门处理第一条帖子（树洞主贴）的函数
+function extractMainPostData(postElement) {
+    try {
+        // 获取帖子ID
+        const idElement = postElement.querySelector('.box-id');
+        const id = idElement ? idElement.textContent.trim().replace('#', '') : '';
+
+        // 获取帖子内容
+        const contentElement = postElement.querySelector('.box-content');
+        if (!contentElement) return null;
+        
+        // 获取主贴内容文本
+        const content = contentElement.innerText.trim();
+        
+        // 提取收藏数和评论数
+        const headerElement = postElement.querySelector('.box-header');
+        let stars = 0;
+        let comments = 0;
+        let publishTime = '';
+        
+        if (headerElement) {
+            // 提取收藏数 (检查两种可能的图标类名)
+            const starBadge = headerElement.querySelector('.box-header-badge .icon-star-ok') || 
+                            headerElement.querySelector('.box-header-badge .icon-star');
+            
+            if (starBadge && starBadge.parentElement) {
+                const starText = starBadge.parentElement.textContent.trim();
+                stars = parseInt(starText) || 0;
+            }
+            
+            // 提取评论数 (可能不存在)
+            const replyBadge = headerElement.querySelector('.box-header-badge .icon-reply');
+            if (replyBadge && replyBadge.parentElement) {
+                const replyText = replyBadge.parentElement.textContent.trim();
+                comments = parseInt(replyText) || 0;
+            }
+            
+            // 提取发布时间 (格式：刚刚&nbsp;03-04 21:35 或 2分钟前&nbsp;03-04 21:35)
+            // 我们优先使用日期部分 (xx-xx xx:xx)
+            const dateTimeMatch = headerElement.textContent.match(/(\d{2}-\d{2} \d{2}:\d{2})/);
+            if (dateTimeMatch) {
+                publishTime = dateTimeMatch[1];
+            } else {
+                // 如果没有匹配到日期格式，尝试提取整个时间信息
+                const timeText = headerElement.textContent.trim().split('        ')[1];
+                if (timeText) {
+                    publishTime = timeText.trim();
+                }
+            }
+        }
+        
+        // 提取图片元素
+        const images = [];
+        const imgElements = contentElement.querySelectorAll('img');
+        imgElements.forEach(img => {
+            if (img.src) {
+                images.push(img.src);
+            }
+        });
+        
+        console.log('提取主贴数据:', { id, stars, comments, publishTime });
+        
+        return {
+            id,
+            speaker: '洞主',  // 主贴发言人一定是洞主
+            content,
+            publishTime: publishTime || '',
+            images,
+            isMainPost: true,  // 标记为主贴
+            stars,            // 收藏数
+            comments          // 评论数
+        };
+    } catch (error) {
+        console.error('[PKU TreeHole] 提取主贴数据出错:', error);
+        return null;
+    }
+}
+
 // 提取评论数据
 function extractCommentData(commentElement) {
     try {
@@ -1422,19 +1500,6 @@ function displayComments(comments, container) {
 
         commentDiv.innerHTML = html;
         container.appendChild(commentDiv);
-        
-        // 为主贴添加渐入动画效果
-        if (comment.isMainPost) {
-            setTimeout(() => {
-                commentDiv.style.transform = 'translateY(-3px)';
-                commentDiv.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
-            }, 100);
-            
-            setTimeout(() => {
-                commentDiv.style.transform = 'translateY(0)';
-                commentDiv.style.boxShadow = '0 2px 10px rgba(0,0,0,0.08)';
-            }, 500);
-        }
     });
 }
 
@@ -2685,85 +2750,6 @@ function getSortMethodName(method) {
         case 'reply': return '按评论数排序';
         case 'time': return '按发布时间排序';
         default: return '未知排序方式';
-    }
-}
-
-// 在文件末尾添加主贴相关函数
-// 新增：专门处理第一条帖子（树洞主贴）的函数
-function extractMainPostData(postElement) {
-    try {
-        // 获取帖子ID
-        const idElement = postElement.querySelector('.box-id');
-        const id = idElement ? idElement.textContent.trim().replace('#', '') : '';
-
-        // 获取帖子内容
-        const contentElement = postElement.querySelector('.box-content');
-        if (!contentElement) return null;
-        
-        // 获取主贴内容文本
-        const content = contentElement.innerText.trim();
-        
-        // 提取收藏数和评论数
-        const headerElement = postElement.querySelector('.box-header');
-        let stars = 0;
-        let comments = 0;
-        let publishTime = '';
-        
-        if (headerElement) {
-            // 提取收藏数 (检查两种可能的图标类名)
-            const starBadge = headerElement.querySelector('.box-header-badge .icon-star-ok') || 
-                            headerElement.querySelector('.box-header-badge .icon-star');
-            
-            if (starBadge && starBadge.parentElement) {
-                const starText = starBadge.parentElement.textContent.trim();
-                stars = parseInt(starText) || 0;
-            }
-            
-            // 提取评论数 (可能不存在)
-            const replyBadge = headerElement.querySelector('.box-header-badge .icon-reply');
-            if (replyBadge && replyBadge.parentElement) {
-                const replyText = replyBadge.parentElement.textContent.trim();
-                comments = parseInt(replyText) || 0;
-            }
-            
-            // 提取发布时间 (格式：刚刚&nbsp;03-04 21:35 或 2分钟前&nbsp;03-04 21:35)
-            // 我们优先使用日期部分 (xx-xx xx:xx)
-            const dateTimeMatch = headerElement.textContent.match(/(\d{2}-\d{2} \d{2}:\d{2})/);
-            if (dateTimeMatch) {
-                publishTime = dateTimeMatch[1];
-            } else {
-                // 如果没有匹配到日期格式，尝试提取整个时间信息
-                const timeText = headerElement.textContent.trim().split('        ')[1];
-                if (timeText) {
-                    publishTime = timeText.trim();
-                }
-            }
-        }
-        
-        // 提取图片元素
-        const images = [];
-        const imgElements = contentElement.querySelectorAll('img');
-        imgElements.forEach(img => {
-            if (img.src) {
-                images.push(img.src);
-            }
-        });
-        
-        console.log('提取主贴数据:', { id, stars, comments, publishTime });
-        
-        return {
-            id,
-            speaker: '洞主',  // 主贴发言人一定是洞主
-            content,
-            publishTime: publishTime || '',
-            images,
-            isMainPost: true,  // 标记为主贴
-            stars,            // 收藏数
-            comments          // 评论数
-        };
-    } catch (error) {
-        console.error('[PKU TreeHole] 提取主贴数据出错:', error);
-        return null;
     }
 }
 
