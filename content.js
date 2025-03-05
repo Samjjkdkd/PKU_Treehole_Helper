@@ -2230,37 +2230,37 @@ function exportAsImage() {
                                 const item = new ClipboardItem({ 'image/png': blob });
                                 navigator.clipboard.write([item]).then(() => {
                                     if (saveToLocal) {
-                                        updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}，并已复制到剪贴板`);
+                                        updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条）` : ''}，并已复制到剪贴板`);
                                     } else {
-                                        updateGlobalStatus(`已复制 ${displayHoles.length} 条帖子数据为图片${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}到剪贴板`);
+                                        updateCommentCollectorStatus(`已复制 ${displayCount - 1} 条评论数据为图片${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条）` : ''}到剪贴板`);
                                     }
                                 }).catch(err => {
                                     console.error('无法复制图片到剪贴板: ', err);
                                     if (saveToLocal) {
-                                        updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}（复制到剪贴板失败）`);
+                                        updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条）` : ''}（复制到剪贴板失败）`);
                                     } else {
-                                        updateGlobalStatus(`复制帖子数据图片到剪贴板失败`);
+                                        updateCommentCollectorStatus(`复制评论数据图片到剪贴板失败`);
                                     }
                                 });
                             } catch (err) {
                                 console.error('ClipboardItem不受支持: ', err);
                                 if (saveToLocal) {
-                                    updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+                                    updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条）` : ''}`);
                                 } else {
-                                    updateGlobalStatus(`复制到剪贴板失败（ClipboardItem不受支持）`);
+                                    updateCommentCollectorStatus(`复制到剪贴板失败（ClipboardItem不受支持）`);
                                 }
                             }
                         });
                     } catch (err) {
                         console.error('无法使用剪贴板功能: ', err);
                         if (saveToLocal) {
-                            updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+                            updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条）` : ''}`);
                         } else {
-                            updateGlobalStatus(`复制到剪贴板失败（无法使用剪贴板功能）`);
+                            updateCommentCollectorStatus(`复制到剪贴板失败（无法使用剪贴板功能）`);
                         }
                     }
                 } else {
-                    updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+                    updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条）` : ''}`);
                 }
             });
         })
@@ -2610,34 +2610,63 @@ function exportHolesAsImage() {
             // 移除临时容器
             document.body.removeChild(tempContainer);
 
-            // 将canvas转换为图片并下载
-            const imgData = canvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.href = imgData;
-            link.download = `PKU_TreeHole_导出_${new Date().getTime()}.png`;
-            link.click();
-
-            // 尝试将图片复制到剪贴板
-            try {
-                // 在某些浏览器中，可以直接从canvas获取剪贴板项
-                canvas.toBlob(blob => {
+            // 获取导出设置并执行导出
+            getExportSettings().then(exportMode => {
+                let saveToLocal = exportMode === 'save' || exportMode === 'both';
+                let copyToClipboard = exportMode === 'copy' || exportMode === 'both';
+                
+                // 将canvas转换为图片数据
+                const imgData = canvas.toDataURL('image/png');
+                
+                // 根据设置保存到本地
+                if (saveToLocal) {
+                    const link = document.createElement('a');
+                    link.href = imgData;
+                    link.download = `PKU_TreeHole_导出_${new Date().getTime()}.png`;
+                    link.click();
+                }
+                
+                // 根据设置复制到剪贴板
+                if (copyToClipboard) {
                     try {
-                        const item = new ClipboardItem({ 'image/png': blob });
-                        navigator.clipboard.write([item]).then(() => {
-                            updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}，并已复制到剪贴板`);
-                        }).catch(err => {
-                            console.error('无法复制图片到剪贴板: ', err);
-                            updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}（复制到剪贴板失败）`);
+                        canvas.toBlob(blob => {
+                            try {
+                                const item = new ClipboardItem({ 'image/png': blob });
+                                navigator.clipboard.write([item]).then(() => {
+                                    if (saveToLocal) {
+                                        updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}，并已复制到剪贴板`);
+                                    } else {
+                                        updateGlobalStatus(`已复制 ${displayHoles.length} 条帖子数据为图片${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}到剪贴板`);
+                                    }
+                                }).catch(err => {
+                                    console.error('无法复制图片到剪贴板: ', err);
+                                    if (saveToLocal) {
+                                        updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}（复制到剪贴板失败）`);
+                                    } else {
+                                        updateGlobalStatus(`复制帖子数据图片到剪贴板失败`);
+                                    }
+                                });
+                            } catch (err) {
+                                console.error('ClipboardItem不受支持: ', err);
+                                if (saveToLocal) {
+                                    updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+                                } else {
+                                    updateGlobalStatus(`复制到剪贴板失败（ClipboardItem不受支持）`);
+                                }
+                            }
                         });
                     } catch (err) {
-                        console.error('ClipboardItem不受支持: ', err);
-                        updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+                        console.error('无法使用剪贴板功能: ', err);
+                        if (saveToLocal) {
+                            updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+                        } else {
+                            updateGlobalStatus(`复制到剪贴板失败（无法使用剪贴板功能）`);
+                        }
                     }
-                });
-            } catch (err) {
-                console.error('无法使用剪贴板功能: ', err);
-                updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
-            }
+                } else {
+                    updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+                }
+            });
         })
         .catch(error => {
             // 确保在出错时也移除临时容器
