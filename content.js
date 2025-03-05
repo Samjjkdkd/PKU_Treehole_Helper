@@ -101,7 +101,13 @@ function autoScroll() {
             isScrolling = false;
 
             if (timeExpired || reachedLimit) {
-                stopCollection(true);
+                let reason = '';
+                if (timeExpired) {
+                    reason = '达到时间限制';
+                } else if (reachedLimit) {
+                    reason = '达到数量限制';
+                }
+                stopCollection(true, reason);
                 scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
                 console.log("[PKU TreeHole] 达到限制条件，停止滚动");
             } else {
@@ -151,7 +157,7 @@ function processHoles() {
                 if (postTime <= endTime) {
                     console.log("[PKU TreeHole] 达到时间限制，发现早于截止时间的帖子:", id, "发布时间:", publishTime);
                     reachedTimeLimit = true;
-                    stopCollection(true);
+                    stopCollection(true, '达到发布时间限制');
                     return;
                 }
             }
@@ -190,7 +196,15 @@ function processHoles() {
         const reachedLimit = postsLimit && holesData.length >= postsLimit;
 
         if (timeExpired || reachedLimit || reachedTimeLimit) {
-            stopCollection(true);
+            let reason = '';
+            if (timeExpired) {
+                reason = '达到搜寻时间限制';
+            } else if (reachedLimit) {
+                reason = '达到帖子数量限制';
+            } else if (reachedTimeLimit) {
+                reason = '达到发布时间限制';
+            }
+            stopCollection(true, reason);
         }
     }
 }
@@ -270,8 +284,8 @@ function startCollection(options) {
 }
 
 // 停止收集数据
-function stopCollection(updateUI = false) {
-    console.log("[PKU TreeHole] 停止收集，共收集到", holesData.length, "条帖子");
+function stopCollection(updateUI = false, reason = '') {
+    console.log("[PKU TreeHole] 停止收集，共收集到", holesData.length, "条帖子", reason ? `，原因: ${reason}` : '');
 
     isCollecting = false;
     if (checkInterval) {
@@ -316,23 +330,32 @@ function stopCollection(updateUI = false) {
             // 获取最后一条帖子的发布时间
             const lastTime = holesData.length > 0 ? holesData[holesData.length - 1].publishTime : '';
             
+            // 构建状态消息
+            let statusMessage = `收集完成，共 ${holesData.length} 条数据`;
+            if (lastTime) {
+                statusMessage += `，最后帖子发布于 ${lastTime}`;
+            }
+            if (reason) {
+                statusMessage += `（${reason}）`;
+            }
+            
             try {
                 // 尝试调用面板特定的updateStatus函数
                 if (typeof updateStatus === 'function') {
                     console.log("[PKU TreeHole] 调用updateStatus函数");
-                    updateStatus(`收集完成，共 ${holesData.length} 条数据${lastTime ? '，最后帖子发布于 ' + lastTime : ''}`);
+                    updateStatus(statusMessage);
                     displayHoles(holesData);
                 } else {
                     // 如果updateStatus不可用，使用全局状态更新
                     console.log("[PKU TreeHole] updateStatus函数不可用，使用全局状态更新");
-                    updateGlobalStatus(`收集完成，共 ${holesData.length} 条数据${lastTime ? '，最后帖子发布于 ' + lastTime : ''}`);
+                    updateGlobalStatus(statusMessage);
                 }
             } catch (error) {
                 console.error("[PKU TreeHole] 更新状态时出错:", error);
                 // 尝试直接更新DOM
                 const statusText = panel.querySelector('#status-text');
                 if (statusText) {
-                    statusText.textContent = `收集完成，共 ${holesData.length} 条数据${lastTime ? '，最后帖子发布于 ' + lastTime : ''}`;
+                    statusText.textContent = statusMessage;
                     statusText.style.background = '#e8f5e9';
                     statusText.style.display = 'block';
                 }
@@ -340,7 +363,7 @@ function stopCollection(updateUI = false) {
         } else {
             console.log("[PKU TreeHole] 未找到面板元素");
             // 使用全局状态更新
-            updateGlobalStatus(`收集完成，共 ${holesData.length} 条数据`);
+            updateGlobalStatus(`收集完成，共 ${holesData.length} 条数据${reason ? ` (${reason})` : ''}`);
         }
     }
 }
@@ -364,7 +387,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
             break;
 
         case "stopCollection":
-            stopCollection(true);
+            stopCollection(true, '从弹出窗口停止');
             sendResponse({ success: true });
             break;
 
@@ -721,12 +744,12 @@ function createFloatingPanel() {
             updateStatus(`开始收集数据，当前已有 ${currentCount || 0} 条数据${autoScrollEnabled ? '' : '（手动滚动模式）'}`);
         } catch (error) {
             updateStatus('收集数据失败: ' + error.message, true);
-            stopCollection(true);
+            stopCollection(true, '出现错误');
         }
     });
 
     stopBtn.addEventListener('click', function () {
-        stopCollection(true);
+        stopCollection(true, '');//手动停止收集不提示
     });
 
     exportTextBtn.addEventListener('click', function () {
