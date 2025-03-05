@@ -1235,11 +1235,7 @@ function collectComments(isInitialCollection = false) {
     // 显示收集到的评论
     const dialogCommentsContainer = document.getElementById("comments-container");
     if (dialogCommentsContainer) {
-        // 清空之前的内容
-        if (!isCommentsScrolling && isInitialCollection) {
-            dialogCommentsContainer.innerHTML = "";
-        }
-
+        // 不再需要在这里清空容器，因为displayComments函数已经会清空容器
         // 显示评论
         displayComments(comments, dialogCommentsContainer);
 
@@ -1455,6 +1451,9 @@ function extractCommentData(commentElement) {
 // 显示评论数据
 function displayComments(comments, container) {
     if (!container) return;
+
+    // 确保在显示评论前清空容器
+    container.innerHTML = '';
 
     if (!comments || comments.length === 0) {
         container.innerHTML = '<div style="padding: 10px; text-align: center;">暂无评论数据</div>';
@@ -2103,7 +2102,7 @@ function filterAndDisplayComments() {
     // 显示筛选后的评论
     const commentsContainer = document.getElementById('comments-container');
     if (commentsContainer) {
-        commentsContainer.innerHTML = '';  // 清空容器
+        // 不需要在这里清空容器，因为displayComments函数已经会清空容器
         displayComments(filteredComments, commentsContainer);
         
         // 更新评论数显示 (主贴不计入评论数)
