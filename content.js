@@ -493,6 +493,7 @@ function createFloatingPanel() {
             <div class="sort-option">
                 <label>排序方式：</label>
                 <select id="sort-method">
+                    <option value="comprehensive" selected>按综合关注程度排序</option>
                     <option value="like">按收藏数排序</option>
                     <option value="reply">按评论数排序</option>
                     <option value="time">按发布时间排序</option>
@@ -608,6 +609,14 @@ function createFloatingPanel() {
                     const timeA = a.publishTime.split(' ').reverse().join(' ');
                     const timeB = b.publishTime.split(' ').reverse().join(' ');
                     return timeB.localeCompare(timeA);
+                });
+                break;
+            case 'comprehensive':
+                // 按照收藏量乘以评论量的综合指标排序
+                sortedHoles.sort((a, b) => {
+                    const scoreA = a.likeCount * a.replyCount;
+                    const scoreB = b.likeCount * b.replyCount;
+                    return scoreB - scoreA; // 降序排列
                 });
                 break;
         }
@@ -2235,6 +2244,7 @@ function exportAsText() {
 
 // 导出为图片格式
 function exportAsImage() {
+    updateCommentCollectorStatus(`导出评论数据为图片...`);
     // 获取评论容器
     const commentsContainer = document.getElementById('comments-container');
     if (!commentsContainer) {
@@ -2276,6 +2286,9 @@ function exportAsImage() {
     const filteredComments = document.querySelectorAll('#comments-container .collected-comment');
     const totalFilteredComments = filteredComments.length;
     
+    // 计算实际评论数量（不包括主贴）
+    const actualCommentCount = allCommentsData.filter(comment => !comment.isMainPost).length;
+    
     // 设置最大显示条数限制
     const MAX_COMMENTS_TO_DISPLAY = 101;
     const displayCount = Math.min(totalFilteredComments, MAX_COMMENTS_TO_DISPLAY);
@@ -2284,7 +2297,7 @@ function exportAsImage() {
         <h2 style="margin: 0 0 10px 0;">${holeId}</h2>
         <div style="color: #666; font-size: 14px;">
             <div>导出时间：${new Date().toLocaleString()}</div>
-            <div>评论数量：${allCommentsData.length} (显示: ${displaySpeaker})</div>
+            <div>评论数量：${actualCommentCount} (显示: ${displaySpeaker})</div>
             <div>最晚评论时间：${latestCommentTime || '未知'}</div>
         </div>
     `;
@@ -2311,7 +2324,7 @@ function exportAsImage() {
         moreInfo.style.padding = '15px';
         moreInfo.style.marginTop = '10px';
         moreInfo.style.borderTop = '1px dashed #ddd';
-        moreInfo.textContent = `注：图片中仅显示前${MAX_COMMENTS_TO_DISPLAY - 1}条评论，共有 ${totalFilteredComments - 1} 条评论。请使用文本导出获取完整数据。`;
+        moreInfo.textContent = `注：图片中仅显示前${MAX_COMMENTS_TO_DISPLAY - 1}条评论，共有 ${actualCommentCount} 条评论。请使用文本导出获取完整数据。`;
         contentClone.appendChild(moreInfo);
     }
 
@@ -2360,14 +2373,16 @@ function exportAsImage() {
                                 const item = new ClipboardItem({ 'image/png': blob });
                                 navigator.clipboard.write([item]).then(() => {
                                     if (saveToLocal) {
-                                        updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条）` : ''}，并已复制到剪贴板`);
+                                        updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}，并已复制到剪贴板`);
+                                    } else if (exportSettings.onlyClipboard) {
+                                        updateCommentCollectorStatus(`已复制 ${displayCount - 1} 条评论数据为图片${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}到剪贴板`);
                                     } else {
-                                        updateCommentCollectorStatus(`已复制 ${displayCount - 1} 条评论数据为图片${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条）` : ''}到剪贴板`);
+                                        updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}（复制到剪贴板失败）`);
                                     }
                                 }).catch(err => {
                                     console.error('无法复制图片到剪贴板: ', err);
                                     if (saveToLocal) {
-                                        updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条）` : ''}（复制到剪贴板失败）`);
+                                        updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}（复制到剪贴板失败）`);
                                     } else {
                                         updateCommentCollectorStatus(`复制评论数据图片到剪贴板失败`);
                                     }
@@ -2375,7 +2390,7 @@ function exportAsImage() {
                             } catch (err) {
                                 console.error('ClipboardItem不受支持: ', err);
                                 if (saveToLocal) {
-                                    updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条）` : ''}`);
+                                    updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}`);
                                 } else {
                                     updateCommentCollectorStatus(`复制到剪贴板失败（ClipboardItem不受支持）`);
                                 }
@@ -2384,13 +2399,13 @@ function exportAsImage() {
                     } catch (err) {
                         console.error('无法使用剪贴板功能: ', err);
                         if (saveToLocal) {
-                            updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条）` : ''}`);
+                            updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}`);
                         } else {
                             updateCommentCollectorStatus(`复制到剪贴板失败（无法使用剪贴板功能）`);
                         }
                     }
                 } else {
-                    updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条）` : ''}`);
+                    updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}`);
                 }
             });
         })
@@ -2568,6 +2583,14 @@ function exportHolesAsText() {
                 return timeB.localeCompare(timeA);
             });
             break;
+        case 'comprehensive':
+            // 按照收藏量乘以评论量的综合指标排序
+            sortedHoles.sort((a, b) => {
+                const scoreA = a.likeCount * a.replyCount;
+                const scoreB = b.likeCount * b.replyCount;
+                return scoreB - scoreA; // 降序排列
+            });
+            break;
     }
 
     // 添加每个树洞的数据
@@ -2639,6 +2662,7 @@ function exportHolesAsText() {
 
 // 导出悬浮窗中的树洞数据为图片格式
 function exportHolesAsImage() {
+    updateGlobalStatus(`导出树洞数据为图片...`);
     if (!holesData || holesData.length === 0) {
         updateGlobalStatus('没有可导出的数据，请先收集数据', true);
         return;
@@ -2682,6 +2706,14 @@ function exportHolesAsImage() {
                 const timeA = a.publishTime.split(' ').reverse().join(' ');
                 const timeB = b.publishTime.split(' ').reverse().join(' ');
                 return timeB.localeCompare(timeA);
+            });
+            break;
+        case 'comprehensive':
+            // 按照收藏量乘以评论量的综合指标排序
+            sortedHoles.sort((a, b) => {
+                const scoreA = a.likeCount * a.replyCount;
+                const scoreB = b.likeCount * b.replyCount;
+                return scoreB - scoreA; // 降序排列
             });
             break;
     }
@@ -2814,6 +2846,7 @@ function getSortMethodName(method) {
         case 'like': return '按收藏数排序';
         case 'reply': return '按评论数排序';
         case 'time': return '按发布时间排序';
+        case 'comprehensive': return '按综合关注程度排序';
         default: return '未知排序方式';
     }
 }
