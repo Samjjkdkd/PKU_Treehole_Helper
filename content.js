@@ -819,7 +819,7 @@ function showCommentCollectorDialog() {
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <button id="toggle-collect-comments" class="action-button hover-effect" style="background-color: #1a73e8; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; min-width: 100px;">开始收集</button>
                     <div style="display: flex; align-items: center;">
-                        <input type="checkbox" id="auto-scroll-comments" style="margin-right: 5px;">
+                        <input type="checkbox" id="auto-scroll-comments" style="margin-right: 5px;" checked>
                         <label for="auto-scroll-comments" style="cursor: pointer; font-size: 14px;">自动滚动</label>
                     </div>
                 </div>
