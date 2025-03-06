@@ -1,4 +1,4 @@
-# PKU TreeHole Helper
+# PKU Treehole Helper
 
 ## 介绍
 

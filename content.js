@@ -165,7 +165,7 @@ function processHoles() {
             // 存储数据
             const holeData = {
                 id: id,
-                content: content,
+                content,
                 likeCount: count,
                 replyCount: replies,
                 publishTime: publishTime,
@@ -873,7 +873,7 @@ function showCommentCollectorDialog() {
         #toggle-collect-comments:hover {
             filter: brightness(1.1);
         }
-        #export-text:hover, #export-image:hover {
+        #export-text:hover, #export-image:hover, #summarize-treehole:hover {
             filter: brightness(1.1);
         }
     `;
@@ -927,11 +927,17 @@ function showCommentCollectorDialog() {
                 </div>
                 
                 <div id="export-controls" style="display: none; margin-top: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                         <span style="font-size: 13px;">导出评论：</span>
                         <div style="display: flex; gap: 8px;">
                             <button id="export-text" class="hover-effect" style="background-color: #4CAF50; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 13px;">文本格式</button>
                             <button id="export-image" class="hover-effect" style="background-color: #2196F3; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 13px;">图片格式</button>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 13px;">AI功能：</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button id="summarize-treehole" class="hover-effect" style="background-color: #9C27B0; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 13px;">总结树洞</button>
                         </div>
                     </div>
                 </div>
@@ -997,6 +1003,12 @@ function showCommentCollectorDialog() {
     const exportImageButton = document.getElementById('export-image');
     if (exportImageButton) {
         exportImageButton.addEventListener('click', exportAsImage);
+    }
+
+    // 添加总结树洞按钮事件监听器
+    const summarizeButton = document.getElementById('summarize-treehole');
+    if (summarizeButton) {
+        summarizeButton.addEventListener('click', summarizeTreehole);
     }
 
     // 添加拖拽功能
@@ -2373,7 +2385,7 @@ function exportAsImage() {
                                 navigator.clipboard.write([item]).then(() => {
                                     if (saveToLocal) {
                                         updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}，并已复制到剪贴板`);
-                                    } else if (exportSettings.onlyClipboard) {
+                                    } else if (exportMode === 'copy') {
                                         updateCommentCollectorStatus(`已复制 ${displayCount - 1} 条评论数据为图片${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}到剪贴板`);
                                     } else {
                                         updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}（复制到剪贴板失败）`);
@@ -2865,5 +2877,282 @@ function getExportSettings() {
       resolve('both');
     }
   });
+}
+
+// 获取API设置
+function getApiSettings() {
+    return new Promise((resolve) => {
+        if (typeof chrome !== 'undefined' && chrome.storage) {
+            chrome.storage.sync.get({
+                // 默认值
+                aiModel: 'baidu',
+                apiKey: '',
+                apiSecret: ''
+            }, function(items) {
+                resolve({
+                    aiModel: items.aiModel,
+                    apiKey: items.apiKey,
+                    apiSecret: items.apiSecret
+                });
+            });
+        } else {
+            // 如果无法访问chrome.storage，返回空值
+            resolve({
+                aiModel: 'baidu',
+                apiKey: '',
+                apiSecret: ''
+            });
+        }
+    });
+}
+
+// 获取百度文心API访问令牌
+async function getBaiduAccessToken(apiKey, apiSecret) {
+    try {
+        const response = await fetch('https://aip.baidubce.com/oauth/2.0/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: `grant_type=client_credentials&client_id=${apiKey}&client_secret=${apiSecret}`
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API请求失败: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data.access_token;
+    } catch (error) {
+        console.error('获取访问令牌失败:', error);
+        throw error;
+    }
+}
+
+// 调用百度文心大模型API进行树洞总结
+async function summarizeWithBaiduAI(content, accessToken) {
+    try {
+        const apiUrl = `https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/ernie-bot-4?access_token=${accessToken}`;
+        
+        const prompt = `请总结以下树洞内容的主要观点和讨论要点，提炼关键信息，生成一个简洁的摘要：\n\n${content}`;
+        
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ]
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API请求失败: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data.result || data.response || '无法获取总结结果';
+    } catch (error) {
+        console.error('调用AI模型失败:', error);
+        throw error;
+    }
+}
+
+// 总结树洞内容
+async function summarizeTreehole() {
+    try {
+        updateCommentCollectorStatus('正在准备总结树洞内容...');
+        
+        // 检查是否有评论数据
+        if (!allCommentsData || allCommentsData.length === 0) {
+            updateCommentCollectorStatus('没有可用的评论数据，请先收集评论', true);
+            return;
+        }
+        
+        // 获取API设置
+        const apiSettings = await getApiSettings();
+        
+        // 检查API设置有效性
+        if (!apiSettings.apiKey) {
+            updateCommentCollectorStatus('请先在扩展设置中配置API KEY', true);
+            return;
+        }
+        
+        // 如果选择百度文心，需要检查Secret Key
+        if (apiSettings.aiModel === 'baidu' && !apiSettings.apiSecret) {
+            updateCommentCollectorStatus('请先在扩展设置中配置百度文心的Secret Key', true);
+            return;
+        }
+        
+        // 获取当前筛选条件
+        const speakerFilter = document.getElementById('speaker-filter');
+        const selectedSpeaker = speakerFilter ? speakerFilter.value : 'all';
+        
+        // 创建总结容器
+        let summaryContainer = document.getElementById('summary-container');
+        if (!summaryContainer) {
+            summaryContainer = document.createElement('div');
+            summaryContainer.id = 'summary-container';
+            summaryContainer.style.padding = '15px';
+            summaryContainer.style.marginBottom = '15px'; // 改为下边距，因为现在在上方
+            summaryContainer.style.backgroundColor = '#f8f9fa';
+            summaryContainer.style.borderRadius = '8px';
+            summaryContainer.style.border = '1px solid #e9ecef';
+            
+            // 添加到评论容器之前（主贴上方）
+            const commentsContainer = document.getElementById('comments-container');
+            if (commentsContainer && commentsContainer.parentNode) {
+                commentsContainer.parentNode.insertBefore(summaryContainer, commentsContainer);
+            }
+        }
+        
+        // 显示正在生成总结的提示
+        summaryContainer.innerHTML = `
+            <h4 style="margin: 0 0 10px 0; display: flex; align-items: center;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#9C27B0" style="margin-right: 8px;">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                </svg>
+                树洞内容总结 (${apiSettings.aiModel === 'baidu' ? '百度文心' : '智谱GLM-4'})
+                ${selectedSpeaker !== 'all' ? `<span style="font-size: 12px; color: #666; margin-left: 8px;">- 仅包含${selectedSpeaker}的评论</span>` : ''}
+            </h4>
+            <div style="padding: 10px; background-color: #fff; border-radius: 4px; border: 1px dashed #ccc;">
+                <p style="margin: 0; text-align: center;">正在生成总结，请稍候...</p>
+            </div>
+        `;
+        
+        // 准备树洞内容
+        if (selectedSpeaker !== 'all') {
+            updateCommentCollectorStatus(`正在准备树洞内容（仅主贴和${selectedSpeaker}的评论）...`);
+        } else {
+            updateCommentCollectorStatus('正在准备树洞内容...');
+        }
+        
+        // 提取主贴
+        const mainPost = allCommentsData.find(comment => comment.isMainPost);
+        
+        // 筛选评论（根据发言人筛选）
+        let filteredComments = allCommentsData.filter(comment => !comment.isMainPost);
+        if (selectedSpeaker !== 'all') {
+            filteredComments = filteredComments.filter(comment => comment.speaker === selectedSpeaker);
+        }
+        
+        let content = '';
+        
+        // 添加主贴内容
+        if (mainPost) {
+            content += `【主贴】${mainPost.content}\n\n`;
+        }
+        
+        // 添加筛选后的评论内容（最多添加50条，防止超出API限制）
+        const maxComments = Math.min(filteredComments.length, 50);
+        for (let i = 0; i < maxComments; i++) {
+            content += `【${filteredComments[i].speaker}】${filteredComments[i].content}\n`;
+        }
+        
+        updateCommentCollectorStatus(`正在调用${apiSettings.aiModel === 'baidu' ? '百度文心' : '智谱GLM-4'} API进行总结...`);
+        
+        // 根据选择的模型调用不同的API
+        let summary;
+        if (apiSettings.aiModel === 'baidu') {
+            // 获取百度文心访问令牌
+            const accessToken = await getBaiduAccessToken(apiSettings.apiKey, apiSettings.apiSecret);
+            summary = await summarizeWithBaiduAI(content, accessToken);
+        } else {
+            // 直接使用智谱GLM-4 API
+            summary = await summarizeWithZhipuAI(content, apiSettings.apiKey);
+        }
+        
+        // 更新总结内容
+        summaryContainer.innerHTML = `
+            <h4 style="margin: 0 0 10px 0; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#9C27B0" style="margin-right: 8px;">
+                        <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+                    </svg>
+                    树洞内容总结 (${apiSettings.aiModel === 'baidu' ? '百度文心' : '智谱GLM-4'})
+                    ${selectedSpeaker !== 'all' ? `<span style="font-size: 12px; color: #666; margin-left: 8px;">- 仅包含${selectedSpeaker}的评论</span>` : ''}
+                </div>
+                <button id="copy-summary" class="hover-effect" style="background-color: #9C27B0; color: white; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">复制总结</button>
+            </h4>
+            <div style="padding: 10px; background-color: #fff; border-radius: 4px; border: 1px solid #e0e0e0; line-height: 1.6;">
+                ${summary.replace(/\n/g, '<br>')}
+            </div>
+        `;
+        
+        // 添加复制总结按钮事件
+        document.getElementById('copy-summary').addEventListener('click', function() {
+            navigator.clipboard.writeText(summary)
+                .then(() => {
+                    updateCommentCollectorStatus('总结已复制到剪贴板');
+                })
+                .catch(err => {
+                    console.error('复制总结失败:', err);
+                    updateCommentCollectorStatus('复制总结失败', true);
+                });
+        });
+        
+        updateCommentCollectorStatus('树洞内容总结完成');
+        
+    } catch (error) {
+        console.error('总结树洞失败:', error);
+        updateCommentCollectorStatus(`总结失败: ${error.message}`, true);
+        
+        // 更新总结容器显示错误
+        const summaryContainer = document.getElementById('summary-container');
+        if (summaryContainer) {
+            summaryContainer.innerHTML = `
+                <h4 style="margin: 0 0 10px 0; display: flex; align-items: center;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#f44336" style="margin-right: 8px;">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                    </svg>
+                    总结失败
+                </h4>
+                <div style="padding: 10px; background-color: #fff; border-radius: 4px; border: 1px solid #f44336; color: #f44336;">
+                    ${error.message || '总结树洞内容时发生错误'}
+                </div>
+            `;
+        }
+    }
+}
+
+// 调用智谱GLM-4 API进行树洞总结
+async function summarizeWithZhipuAI(content, apiKey) {
+    try {
+        const apiUrl = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+        
+        const prompt = `请总结以下树洞内容的主要观点和讨论要点，提炼关键信息，生成一个简洁的摘要：\n\n${content}`;
+        
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'glm-4-flash',
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ]
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API请求失败: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        return data.choices[0].message.content || '无法获取总结结果';
+    } catch (error) {
+        console.error('调用智谱GLM-4 API失败:', error);
+        throw error;
+    }
 }
 

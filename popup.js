@@ -27,14 +27,25 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 保存设置按钮事件
   document.getElementById('save-settings').addEventListener('click', saveSettings);
+  
+  // AI模型选择变化事件
+  document.getElementById('ai-model').addEventListener('change', function() {
+    updateSecretKeyVisibility(this.value);
+  });
 });
 
 // 保存设置到Chrome Storage
 function saveSettings() {
   const exportMode = document.getElementById('export-mode').value;
+  const aiModel = document.getElementById('ai-model').value;
+  const apiKey = document.getElementById('api-key').value;
+  const apiSecret = document.getElementById('api-secret').value;
   
   chrome.storage.sync.set({
-    exportMode: exportMode
+    exportMode: exportMode,
+    aiModel: aiModel,
+    apiKey: apiKey,
+    apiSecret: apiSecret
   }, function() {
     // 显示保存成功消息
     const successMessage = document.getElementById('save-success');
@@ -51,8 +62,27 @@ function saveSettings() {
 function loadSettings() {
   chrome.storage.sync.get({
     // 默认值
-    exportMode: 'both'
+    exportMode: 'both',
+    aiModel: 'baidu',
+    apiKey: '',
+    apiSecret: ''
   }, function(items) {
     document.getElementById('export-mode').value = items.exportMode;
+    document.getElementById('ai-model').value = items.aiModel;
+    document.getElementById('api-key').value = items.apiKey;
+    document.getElementById('api-secret').value = items.apiSecret;
+    
+    // 根据选择的AI模型显示或隐藏Secret Key
+    updateSecretKeyVisibility(items.aiModel);
   });
+}
+
+// 根据AI模型类型显示或隐藏Secret Key输入框
+function updateSecretKeyVisibility(model) {
+  const secretKeyContainer = document.getElementById('secret-key-container');
+  if (model === 'zhipu') {
+    secretKeyContainer.style.display = 'none';
+  } else {
+    secretKeyContainer.style.display = 'block';
+  }
 } 
