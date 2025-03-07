@@ -1123,7 +1123,28 @@ function showCommentCollectorDialog() {
                         <span style="font-size: 13px;">AI功能：</span>
                         <div style="display: flex; gap: 8px;">
                             <button id="summarize-treehole" class="hover-effect" style="background-color: #9C27B0; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 13px;">总结树洞</button>
+                            <button id="generate-reply" class="hover-effect" style="background-color: #FF5722; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 13px;">生成回复</button>
                         </div>
+                    </div>
+                </div>
+                
+                <div id="reply-generation" style="display: none; margin-top: 10px; background-color: #FFF3E0; border-radius: 4px; padding: 10px;">
+                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                        <label for="reply-style" style="margin-right: 8px; font-size: 13px;">回复风格：</label>
+                        <select id="reply-style" style="flex-grow: 1; padding: 5px; border-radius: 4px; border: 1px solid #ddd; font-size: 13px;">
+                            <option value="helpful">友好帮助</option>
+                            <option value="funny">幽默风趣</option>
+                            <option value="empathetic">刻薄嘲讽</option>
+                            <option value="direct">简洁直接</option>
+                            <option value="critical">分析问题</option>
+                        </select>
+                        <button id="refresh-reply" class="hover-effect" style="margin-left: 8px; background-color: #FF5722; color: white; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">刷新</button>
+                    </div>
+                    <div id="generated-reply" style="margin-top: 5px; padding: 8px; background-color: white; border-radius: 4px; border: 1px solid #FFE0B2; font-size: 13px;">
+                        点击"生成回复"按钮自动创建回复...
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; margin-top: 5px;">
+                        <button id="copy-reply" class="hover-effect" style="background-color: #4CAF50; color: white; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">复制回复</button>
                     </div>
                 </div>
             </div>
@@ -1194,6 +1215,39 @@ function showCommentCollectorDialog() {
     const summarizeButton = document.getElementById('summarize-treehole');
     if (summarizeButton) {
         summarizeButton.addEventListener('click', summarizeTreehole);
+    }
+    
+    // 添加生成回复按钮事件监听器
+    const generateReplyButton = document.getElementById('generate-reply');
+    const refreshReplyButton = document.getElementById('refresh-reply');
+    const copyReplyButton = document.getElementById('copy-reply');
+    
+    if (generateReplyButton) {
+        generateReplyButton.addEventListener('click', generateTreeholeReply);
+    }
+    
+    if (refreshReplyButton) {
+        refreshReplyButton.addEventListener('click', generateTreeholeReply);
+    }
+    
+    if (copyReplyButton) {
+        copyReplyButton.addEventListener('click', () => {
+            const replyText = document.getElementById('generated-reply').textContent;
+            if (replyText && replyText !== '点击"生成回复"按钮自动创建回复...' && replyText !== '生成回复时出错，请重试...') {
+                navigator.clipboard.writeText(replyText)
+                    .then(() => {
+                        const originalText = copyReplyButton.textContent;
+                        copyReplyButton.textContent = '已复制!';
+                        setTimeout(() => {
+                            copyReplyButton.textContent = originalText;
+                        }, 1500);
+                    })
+                    .catch(err => {
+                        console.error('复制失败:', err);
+                        alert('复制回复失败，请手动复制');
+                    });
+            }
+        });
     }
 
     // 添加拖拽功能
@@ -3351,10 +3405,9 @@ async function classifyTreehole(content, apiKey) {
     ];
     
     const prompt = `请判断以下树洞内容属于哪个类别，只需回复类别名称，不要解释：
-类别选项：${categories.join("、")}
+    类别选项：${categories.join("、")}
 
-树洞内容：
-${content}`;
+    树洞内容：${content}`;
 
     try {
         const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
@@ -3390,6 +3443,197 @@ ${content}`;
         return classification;
     } catch (error) {
         console.error('分类失败:', error);
+        throw error;
+    }
+}
+
+// 自动生成对树洞的回复
+async function generateTreeholeReply() {
+    try {
+        updateCommentCollectorStatus("正在生成回复...");
+        document.getElementById('generate-reply').disabled = true;
+        document.getElementById('refresh-reply').disabled = true;
+        
+        // 显示生成区域
+        document.getElementById('reply-generation').style.display = 'block';
+        
+        // 获取当前筛选条件
+        const speakerFilter = document.getElementById('speaker-filter');
+        const selectedSpeaker = speakerFilter ? speakerFilter.value : 'all';
+
+        // 提取主贴
+        const mainPost = allCommentsData.find(comment => comment.isMainPost);
+        
+        // 筛选评论（根据发言人筛选）
+        let filteredComments = allCommentsData.filter(comment => !comment.isMainPost);
+        if (selectedSpeaker !== 'all') {
+            filteredComments = filteredComments.filter(comment => comment.speaker === selectedSpeaker);
+        }
+        
+        let content = '';
+        
+        // 添加主贴内容
+        if (mainPost) {
+            content += `【主贴】${mainPost.content}\n\n`;
+        }
+        
+        // 添加筛选后的评论内容（最多添加50条，防止超出API限制）
+        const maxComments = Math.min(filteredComments.length, 50);
+        for (let i = 0; i < maxComments; i++) {
+            content += `【${filteredComments[i].speaker}】${filteredComments[i].content}\n`;
+        }
+
+        // 获取选择的风格
+        const replyStyle = document.getElementById('reply-style').value;
+        
+        // 获取API设置
+        const apiSettings = await getApiSettings();
+        if (!apiSettings.apiKey) {
+            throw new Error("请先在设置中配置API Key");
+        }
+        
+        // 根据当前选择的平台调用不同的API
+        let result;
+        if (apiSettings.aiPlatform === 'deepseek') {
+            result = await generateReplyWithDeepSeekAI(content, apiSettings.apiKey, replyStyle, apiSettings.subModel);
+        } else { // 默认使用智谱AI
+            result = await generateReplyWithZhipuAI(content, apiSettings.apiKey, replyStyle, apiSettings.subModel);
+        }
+        
+        // 显示结果
+        document.getElementById('generated-reply').textContent = result;
+        updateCommentCollectorStatus("回复生成完成！");
+    } catch (error) {
+        console.error("生成回复失败:", error);
+        updateCommentCollectorStatus(`生成回复失败: ${error.message}`, true);
+        document.getElementById('generated-reply').textContent = "生成回复时出错，请重试...";
+    } finally {
+        document.getElementById('generate-reply').disabled = false;
+        document.getElementById('refresh-reply').disabled = false;
+    }
+}
+
+// 使用DeepSeek AI生成回复
+async function generateReplyWithDeepSeekAI(content, apiKey, style, model = 'deepseek-chat') {
+    try {
+        const apiUrl = 'https://api.deepseek.com/v1/chat/completions';
+        
+        // 根据不同风格设置不同的prompt
+        let styleInstruction;
+        switch (style) {
+            case 'funny':
+                styleInstruction = '以幽默风趣的方式';
+                break;
+            case 'empathetic':
+                styleInstruction = '以刻薄嘲讽的方式';
+                break;
+            case 'direct':
+                styleInstruction = '以简洁直接的方式';
+                break;
+            case 'critical':
+                styleInstruction = '以理性分析问题的方式';
+                break;
+            case 'helpful':
+            default:
+                styleInstruction = '以友好帮助的方式';
+                break;
+        }
+        
+        const prompt = `请你阅读以下PKU树洞内容及其评论，然后${styleInstruction}生成一句适合发布在评论区的回复。回复需要自然、不要太长，最好在50字以内：\n\n${content}`;
+        
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                temperature: 0.7,
+                max_tokens: 200
+            })
+        });
+        
+        if (!response.ok) {
+            if (response.status === 402) {
+                throw new Error('DeepSeek API余额不足或API Key无效，请检查API Key或账户余额');
+            } else if (response.status === 401) {
+                throw new Error('DeepSeek API认证失败，请检查API Key是否正确');
+            } else if (response.status === 429) {
+                throw new Error('DeepSeek API请求频率超限，请稍后再试');
+            } else {
+                throw new Error(`API请求失败: ${response.status}`);
+            }
+        }
+        
+        const data = await response.json();
+        return data.choices[0].message.content || '无法生成回复';
+    } catch (error) {
+        console.error('调用DeepSeek API失败:', error);
+        throw error;
+    }
+}
+
+// 使用智谱AI生成回复
+async function generateReplyWithZhipuAI(content, apiKey, style, model = 'glm-4-flash') {
+    try {
+        // 根据不同风格设置不同的prompt
+        let styleInstruction;
+        switch (style) {
+            case 'funny':
+                styleInstruction = '以幽默风趣的方式';
+                break;
+            case 'empathetic':
+                styleInstruction = '以刻薄嘲讽的方式';
+                break;
+            case 'direct':
+                styleInstruction = '以简洁直接的方式';
+                break;
+            case 'critical':
+                styleInstruction = '以理性分析问题的方式';
+                break;
+            case 'helpful':
+            default:
+                styleInstruction = '以友好帮助的方式';
+                break;
+        }
+        
+        const prompt = `请你阅读以下树洞内容及其评论，然后对评论区中的某个人${styleInstruction}生成一句回复。回复需要自然、不要太长，最好在50字以内：\n\n${content}`;
+        
+        const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                temperature: 0.7,
+                top_p: 0.8,
+                max_tokens: 200
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`API请求失败: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.choices[0].message.content || '无法生成回复';
+    } catch (error) {
+        console.error('调用智谱API失败:', error);
         throw error;
     }
 }
