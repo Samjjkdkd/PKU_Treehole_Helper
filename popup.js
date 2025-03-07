@@ -28,33 +28,84 @@ document.addEventListener('DOMContentLoaded', function() {
   // 保存设置按钮事件
   document.getElementById('save-settings').addEventListener('click', saveSettings);
   
-  // AI模型选择变化事件
+  // AI平台选择变化事件
   document.getElementById('ai-model').addEventListener('change', function() {
-    updateSecretKeyVisibility(this.value);
+    // 当选择的平台改变时，显示对应的二级模型选择
+    const selectedPlatform = this.value;
+    updateModelSelector(selectedPlatform);
+    
+    // 加载平台对应的API密钥
+    chrome.storage.sync.get({
+      apiKeys: {},
+    }, function(items) {
+      const apiKeys = items.apiKeys || {};
+      
+      document.getElementById('api-key').value = apiKeys[selectedPlatform] || '';
+    });
   });
 });
+
+// 更新模型选择器的显示状态
+function updateModelSelector(platform) {
+  const deepseekModelContainer = document.getElementById('deepseek-model-container');
+  const zhipuModelContainer = document.getElementById('zhipu-model-container');
+  
+  // 根据选择的平台显示对应的模型选择器
+  if (platform === 'deepseek') {
+    deepseekModelContainer.style.display = 'block';
+    zhipuModelContainer.style.display = 'none';
+  } else if (platform === 'zhipu') {
+    deepseekModelContainer.style.display = 'none';
+    zhipuModelContainer.style.display = 'block';
+  }
+}
 
 // 保存设置到Chrome Storage
 function saveSettings() {
   const exportMode = document.getElementById('export-mode').value;
-  const aiModel = document.getElementById('ai-model').value;
+  const aiPlatform = document.getElementById('ai-model').value;
   const apiKey = document.getElementById('api-key').value;
-  const apiSecret = document.getElementById('api-secret').value;
   
-  chrome.storage.sync.set({
-    exportMode: exportMode,
-    aiModel: aiModel,
-    apiKey: apiKey,
-    apiSecret: apiSecret
-  }, function() {
-    // 显示保存成功消息
-    const successMessage = document.getElementById('save-success');
-    successMessage.style.display = 'block';
+  // 获取对应平台下的模型选择
+  let subModel = '';
+  if (aiPlatform === 'deepseek') {
+    subModel = document.getElementById('deepseek-model').value;
+  } else if (aiPlatform === 'zhipu') {
+    subModel = document.getElementById('zhipu-model').value;
+  }
+  
+  // 先获取已保存的设置
+  chrome.storage.sync.get({
+    // 默认值
+    exportMode: 'both',
+    aiPlatform: 'deepseek',
+    subModel: 'deepseek-chat',
+    apiKeys: {}, // 存储不同平台的API Keys
+  }, function(items) {
+    // 更新当前选择平台的API密钥
+    const apiKeys = items.apiKeys || {};
     
-    // 3秒后隐藏消息
-    setTimeout(function() {
-      successMessage.style.display = 'none';
-    }, 3000);
+    // 只有当密钥不为空时才保存，避免清空已保存的密钥
+    if (apiKey) {
+      apiKeys[aiPlatform] = apiKey;
+    }
+    
+    // 保存设置
+    chrome.storage.sync.set({
+      exportMode: exportMode,
+      aiPlatform: aiPlatform,
+      subModel: subModel,
+      apiKeys: apiKeys,
+    }, function() {
+      // 显示保存成功消息
+      const successMessage = document.getElementById('save-success');
+      successMessage.style.display = 'block';
+      
+      // 3秒后隐藏消息
+      setTimeout(function() {
+        successMessage.style.display = 'none';
+      }, 3000);
+    });
   });
 }
 
@@ -63,26 +114,25 @@ function loadSettings() {
   chrome.storage.sync.get({
     // 默认值
     exportMode: 'both',
-    aiModel: 'baidu',
-    apiKey: '',
-    apiSecret: ''
+    aiPlatform: 'deepseek',
+    subModel: 'deepseek-chat',
+    apiKeys: {},
   }, function(items) {
     document.getElementById('export-mode').value = items.exportMode;
-    document.getElementById('ai-model').value = items.aiModel;
-    document.getElementById('api-key').value = items.apiKey;
-    document.getElementById('api-secret').value = items.apiSecret;
+    document.getElementById('ai-model').value = items.aiPlatform;
     
-    // 根据选择的AI模型显示或隐藏Secret Key
-    updateSecretKeyVisibility(items.aiModel);
+    // 显示对应的二级模型选择器
+    updateModelSelector(items.aiPlatform);
+    
+    // 设置选中的子模型
+    if (items.aiPlatform === 'deepseek') {
+      document.getElementById('deepseek-model').value = items.subModel || 'deepseek-chat';
+    } else if (items.aiPlatform === 'zhipu') {
+      document.getElementById('zhipu-model').value = items.subModel || 'glm-4';
+    }
+    
+    // 加载对应平台的API密钥
+    const apiKeys = items.apiKeys || {};
+    document.getElementById('api-key').value = apiKeys[items.aiPlatform] || '';
   });
-}
-
-// 根据AI模型类型显示或隐藏Secret Key输入框
-function updateSecretKeyVisibility(model) {
-  const secretKeyContainer = document.getElementById('secret-key-container');
-  if (model === 'zhipu') {
-    secretKeyContainer.style.display = 'none';
-  } else {
-    secretKeyContainer.style.display = 'block';
-  }
 } 

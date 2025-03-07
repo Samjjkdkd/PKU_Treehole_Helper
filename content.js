@@ -833,6 +833,13 @@ function showCommentCollectorDialog() {
     if (dialog) {
         // 使用flex而不是block来显示对话框，保持布局结构
         dialog.style.display = 'flex';
+        
+        // 将内容区域滚动到顶部
+        const contentArea = document.getElementById('comment-dialog-content');
+        if (contentArea) {
+            contentArea.scrollTop = 0;
+        }
+        
         return;
     }
 
@@ -1824,6 +1831,12 @@ function startCollectComments() {
     allCommentsData = []; // 清空所有评论数据
     speakerList.clear(); // 清空发言人列表
 
+    // 删除总结容器（如果存在）
+    const summaryContainer = document.getElementById('summary-container');
+    if (summaryContainer) {
+        summaryContainer.remove();
+    }
+
     // 清空评论容器
     const commentsContainer = document.getElementById('comments-container');
     if (commentsContainer) {
@@ -1857,7 +1870,7 @@ function startCollectComments() {
     
     // 立即检查是否已经收集完毕
     const nonMainPostCount = allCommentsData.filter(comment => !comment.isMainPost).length;
-    if (totalExpectedComments > 0 && nonMainPostCount >= totalExpectedComments) {
+    if ((totalExpectedComments > 0 && nonMainPostCount >= totalExpectedComments) || totalExpectedComments === 0) {
         updateCommentCollectorStatus("已收集全部评论，自动停止收集");
         setTimeout(() => {
             if (isCollectingComments) {
@@ -2885,82 +2898,29 @@ function getApiSettings() {
         if (typeof chrome !== 'undefined' && chrome.storage) {
             chrome.storage.sync.get({
                 // 默认值
-                aiModel: 'baidu',
-                apiKey: '',
-                apiSecret: ''
+                aiPlatform: 'deepseek',
+                subModel: 'deepseek-chat',
+                apiKeys: {},
             }, function(items) {
+                const currentPlatform = items.aiPlatform;
+                const currentSubModel = items.subModel;
+                const apiKeys = items.apiKeys || {};
+                
                 resolve({
-                    aiModel: items.aiModel,
-                    apiKey: items.apiKey,
-                    apiSecret: items.apiSecret
+                    aiPlatform: currentPlatform,
+                    subModel: currentSubModel,
+                    apiKey: apiKeys[currentPlatform] || '',
                 });
             });
         } else {
             // 如果无法访问chrome.storage，返回空值
             resolve({
-                aiModel: 'baidu',
+                aiPlatform: 'deepseek',
+                subModel: 'deepseek-chat',
                 apiKey: '',
-                apiSecret: ''
             });
         }
     });
-}
-
-// 获取百度文心API访问令牌
-async function getBaiduAccessToken(apiKey, apiSecret) {
-    try {
-        const response = await fetch('https://aip.baidubce.com/oauth/2.0/token', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: `grant_type=client_credentials&client_id=${apiKey}&client_secret=${apiSecret}`
-        });
-        
-        if (!response.ok) {
-            throw new Error(`API请求失败: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        return data.access_token;
-    } catch (error) {
-        console.error('获取访问令牌失败:', error);
-        throw error;
-    }
-}
-
-// 调用百度文心大模型API进行树洞总结
-async function summarizeWithBaiduAI(content, accessToken) {
-    try {
-        const apiUrl = `https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/ernie-bot-4?access_token=${accessToken}`;
-        
-        const prompt = `请总结以下树洞内容的主要观点和讨论要点，提炼关键信息，生成一个简洁的摘要：\n\n${content}`;
-        
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                messages: [
-                    {
-                        role: 'user',
-                        content: prompt
-                    }
-                ]
-            })
-        });
-        
-        if (!response.ok) {
-            throw new Error(`API请求失败: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        return data.result || data.response || '无法获取总结结果';
-    } catch (error) {
-        console.error('调用AI模型失败:', error);
-        throw error;
-    }
 }
 
 // 总结树洞内容
@@ -2983,12 +2943,6 @@ async function summarizeTreehole() {
             return;
         }
         
-        // 如果选择百度文心，需要检查Secret Key
-        if (apiSettings.aiModel === 'baidu' && !apiSettings.apiSecret) {
-            updateCommentCollectorStatus('请先在扩展设置中配置百度文心的Secret Key', true);
-            return;
-        }
-        
         // 获取当前筛选条件
         const speakerFilter = document.getElementById('speaker-filter');
         const selectedSpeaker = speakerFilter ? speakerFilter.value : 'all';
@@ -2999,7 +2953,7 @@ async function summarizeTreehole() {
             summaryContainer = document.createElement('div');
             summaryContainer.id = 'summary-container';
             summaryContainer.style.padding = '15px';
-            summaryContainer.style.marginBottom = '15px'; // 改为下边距，因为现在在上方
+            summaryContainer.style.marginBottom = '15px';
             summaryContainer.style.backgroundColor = '#f8f9fa';
             summaryContainer.style.borderRadius = '8px';
             summaryContainer.style.border = '1px solid #e9ecef';
@@ -3017,7 +2971,7 @@ async function summarizeTreehole() {
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#9C27B0" style="margin-right: 8px;">
                     <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
                 </svg>
-                树洞内容总结 (${apiSettings.aiModel === 'baidu' ? '百度文心' : '智谱GLM-4'})
+                树洞内容总结 (${apiSettings.aiPlatform === 'deepseek' ? 'DeepSeek' : '智谱GLM-4'})
                 ${selectedSpeaker !== 'all' ? `<span style="font-size: 12px; color: #666; margin-left: 8px;">- 仅包含${selectedSpeaker}的评论</span>` : ''}
             </h4>
             <div style="padding: 10px; background-color: #fff; border-radius: 4px; border: 1px dashed #ccc;">
@@ -3054,17 +3008,43 @@ async function summarizeTreehole() {
             content += `【${filteredComments[i].speaker}】${filteredComments[i].content}\n`;
         }
         
-        updateCommentCollectorStatus(`正在调用${apiSettings.aiModel === 'baidu' ? '百度文心' : '智谱GLM-4'} API进行总结...`);
+        // 准备好模型名称显示
+        const modelNameForStatus = apiSettings.aiPlatform === 'deepseek' ? 
+            (apiSettings.subModel === 'deepseek-reasoner' ? 'DeepSeek-R1' : 'DeepSeek-V3') : 
+            `智谱${apiSettings.subModel.toUpperCase()}`;
+        
+        updateCommentCollectorStatus(`正在调用${modelNameForStatus} API进行总结...`);
         
         // 根据选择的模型调用不同的API
         let summary;
-        if (apiSettings.aiModel === 'baidu') {
-            // 获取百度文心访问令牌
-            const accessToken = await getBaiduAccessToken(apiSettings.apiKey, apiSettings.apiSecret);
-            summary = await summarizeWithBaiduAI(content, accessToken);
+        if (apiSettings.aiPlatform === 'deepseek') {
+            summary = await summarizeWithDeepSeekAI(content, apiSettings.apiKey, apiSettings.subModel);
         } else {
-            // 直接使用智谱GLM-4 API
-            summary = await summarizeWithZhipuAI(content, apiSettings.apiKey);
+            summary = await summarizeWithZhipuAI(content, apiSettings.apiKey, apiSettings.subModel);
+        }
+        
+        
+        // 获取模型名称显示
+        let modelDisplayName = "";
+        if (apiSettings.aiPlatform === 'deepseek') {
+            if (apiSettings.subModel === 'deepseek-chat') {
+                modelDisplayName = "DeepSeek-V3";
+            } else if (apiSettings.subModel === 'deepseek-reasoner') {
+                modelDisplayName = "DeepSeek-R1";
+            } else {
+                modelDisplayName = "DeepSeek";
+            }
+        } else {
+            // 智谱GLM型号显示
+            const modelMap = {
+                'glm-4-plus': 'GLM-4-Plus',
+                'glm-4-air': 'GLM-4-Air',
+                'glm-4-airx': 'GLM-4-AirX',
+                'glm-4-long': 'GLM-4-Long',
+                'glm-4-flashx': 'GLM-4-FlashX',
+                'glm-4-flash': 'GLM-4-Flash(免费)'
+            };
+            modelDisplayName = modelMap[apiSettings.subModel] || '智谱GLM';
         }
         
         // 更新总结内容
@@ -3074,7 +3054,7 @@ async function summarizeTreehole() {
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#9C27B0" style="margin-right: 8px;">
                         <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
                     </svg>
-                    树洞内容总结 (${apiSettings.aiModel === 'baidu' ? '百度文心' : '智谱GLM-4'})
+                    树洞内容总结 (${modelDisplayName})
                     ${selectedSpeaker !== 'all' ? `<span style="font-size: 12px; color: #666; margin-left: 8px;">- 仅包含${selectedSpeaker}的评论</span>` : ''}
                 </div>
                 <button id="copy-summary" class="hover-effect" style="background-color: #9C27B0; color: white; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">复制总结</button>
@@ -3121,7 +3101,7 @@ async function summarizeTreehole() {
 }
 
 // 调用智谱GLM-4 API进行树洞总结
-async function summarizeWithZhipuAI(content, apiKey) {
+async function summarizeWithZhipuAI(content, apiKey, model = 'glm-4-flash') {
     try {
         const apiUrl = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
         
@@ -3134,7 +3114,7 @@ async function summarizeWithZhipuAI(content, apiKey) {
                 'Authorization': `Bearer ${apiKey}`
             },
             body: JSON.stringify({
-                model: 'glm-4-flash',
+                model: model,
                 messages: [
                     {
                         role: 'user',
@@ -3155,4 +3135,51 @@ async function summarizeWithZhipuAI(content, apiKey) {
         throw error;
     }
 }
+
+// 调用DeepSeek API进行树洞总结
+async function summarizeWithDeepSeekAI(content, apiKey, model = 'deepseek-chat') {
+    try {
+        const apiUrl = 'https://api.deepseek.com/v1/chat/completions';
+        
+        const prompt = `请总结以下树洞内容的主要观点和讨论要点，提炼关键信息，生成一个简洁的摘要：\n\n${content}`;
+        
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                temperature: 0.7,
+                max_tokens: 1000
+            })
+        });
+        
+        if (!response.ok) {
+            if (response.status === 402) {
+                throw new Error('DeepSeek API余额不足或API Key无效，请检查API Key或账户余额');
+            } else if (response.status === 401) {
+                throw new Error('DeepSeek API认证失败，请检查API Key是否正确');
+            } else if (response.status === 429) {
+                throw new Error('DeepSeek API请求频率超限，请稍后再试');
+            } else {
+                throw new Error(`API请求失败: ${response.status}`);
+            }
+        }
+        
+        const data = await response.json();
+        return data.choices[0].message.content || '无法获取总结结果';
+    } catch (error) {
+        console.error('调用DeepSeek API失败:', error);
+        throw error;
+    }
+}
+
 

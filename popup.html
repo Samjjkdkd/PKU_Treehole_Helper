@@ -166,10 +166,31 @@
         </div>
         
         <div class="setting-item">
-            <label class="setting-label" for="ai-model">AI模型选择：</label>
+            <label class="setting-label" for="ai-model">AI平台选择：</label>
             <select id="ai-model">
-                <option value="baidu">百度文心ERNIE</option>
-                <option value="zhipu">智谱GLM-4</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="zhipu">智谱</option>
+            </select>
+        </div>
+        
+        <div class="setting-item" id="deepseek-model-container">
+            <label class="setting-label" for="deepseek-model">DeepSeek模型：</label>
+            <select id="deepseek-model">
+                <option value="deepseek-chat">DeepSeek-V3</option>
+                <option value="deepseek-reasoner">DeepSeek-R1</option>
+            </select>
+        </div>
+        
+        <div class="setting-item" id="zhipu-model-container" style="display: none;">
+            <label class="setting-label" for="zhipu-model">智谱模型：</label>
+            <select id="zhipu-model">
+                <option value="glm-4">GLM-4</option>
+                <option value="glm-4-plus">GLM-4-Plus</option>
+                <option value="glm-4-air">GLM-4-Air</option>
+                <option value="glm-4-airx">GLM-4-AirX</option>
+                <option value="glm-4-long">GLM-4-Long</option>
+                <option value="glm-4-flashx">GLM-4-FlashX</option>
+                <option value="glm-4-flash">GLM-4-Flash</option>
             </select>
         </div>
         
@@ -177,13 +198,8 @@
             <label class="setting-label" for="api-key">API KEY：</label>
             <input type="password" id="api-key" placeholder="填写API KEY用于树洞总结功能" style="width: 100%; padding: 5px; box-sizing: border-box;">
             <p class="setting-desc" style="font-size: 12px; color: #666; margin-top: 5px;">
-                支持<a href="https://console.bce.baidu.com/qianfan/overview" target="_blank">百度文心千帆</a>和<a href="https://www.bigmodel.cn/dev/api/normal-model/glm-4" target="_blank">智谱GLM-4</a>
+                支持<a href="https://api-docs.deepseek.com/zh-cn/" target="_blank">DeepSeek</a>和<a href="https://www.bigmodel.cn/dev/api/normal-model/glm-4" target="_blank">智谱GLM</a>，不同平台下的各个模型共用API KEY
             </p>
-        </div>
-        
-        <div class="setting-item" id="secret-key-container">
-            <label class="setting-label" for="api-secret">Secret Key（仅百度文心需要）：</label>
-            <input type="password" id="api-secret" placeholder="填写Secret Key用于百度文心API" style="width: 100%; padding: 5px; box-sizing: border-box;">
         </div>
         
         <button id="save-settings">保存设置</button>
