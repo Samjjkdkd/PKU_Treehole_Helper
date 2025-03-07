@@ -641,12 +641,12 @@ function createFloatingPanel() {
             holeDiv.setAttribute('data-hole-id', hole.id);
             holeDiv.innerHTML = `
                 <div>
+                    <span class="category-label" style="margin-left: 8px; color: #9C27B0; font-size: 12px;">${hole.category ? `[${hole.category}]` : ''}</span>
                     <span class="hole-id">#${hole.id}</span>
                     <span class="like-count">收藏数：${hole.likeCount}</span>
                     <span class="reply-count">评论数：${hole.replyCount}</span>
                     <span class="publish-time">${hole.publishTime}</span>
                     ${hole.hasImage ? '<span class="has-image"><i class="icon-image"></i>含图片</span>' : ''}
-                    <span class="category-label" style="margin-left: 8px; color: #9C27B0; font-size: 12px;"></span>
                 </div>
                 <div class="content">${hole.content}</div>
             `;
@@ -897,6 +897,9 @@ function createFloatingPanel() {
                 try {
                     // 执行分类 (这里会等待API响应)
                     const category = await classifyTreehole(hole.content, apiKey);
+                    
+                    // 更新数据中的分类信息
+                    hole.category = category;
                     
                     // 更新分类标签
                     if (categoryLabel) {
