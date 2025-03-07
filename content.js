@@ -62,6 +62,12 @@ let earliestCommentTime = null;
 let latestCommentTime = null; // 新增：用于记录最晚评论时间
 let totalExpectedComments = 0; // 预期的总评论数量
 
+// 在文件适当位置添加全局变量
+let isClassifying = false; // 标记是否正在进行分类
+let classifyInterval = null; // 分类的间隔定时器
+let classifiedCount = 0; // 已分类的数量
+let totalClassifiedCount = 0; // 总共分类的数量（包括此次和之前的）
+
 // 自动滚动函数
 function autoScroll() {
     if (isScrolling) return;
@@ -439,6 +445,12 @@ function createFloatingPanel() {
             filter: brightness(1.1);
         }
         
+        /* 批量分类按钮的悬浮效果 */
+        #batch-classify-btn:hover {
+            background-color: #7B1FA2 !important;
+            filter: brightness(1.1);
+        }
+        
         /* 小按钮的悬浮效果 */
         .small-btn:hover {
             transform: scale(1.1) !important;
@@ -499,9 +511,10 @@ function createFloatingPanel() {
                     <option value="time">按发布时间排序</option>
                 </select>
             </div>
-            <div class="button-group">
-                <button id="start-btn" class="treehole-btn-hover">开始收集数据</button>
-                <button id="stop-btn" class="treehole-btn-hover">停止收集</button>
+            <div class="button-group" style="display: flex; align-items: center;">
+                <button id="start-btn" class="treehole-btn-hover" style="width: 120px;">开始收集数据</button>
+                <button id="stop-btn" class="treehole-btn-hover" style="display: none; width: 120px;">停止收集</button>
+                <button id="batch-classify-btn" class="treehole-btn-hover" style="background-color: #9C27B0; color: white; border: none; border-radius: 4px; margin-left: 10px; cursor: pointer;">批量分类</button>
             </div>
             <div class="export-group" style="margin-top: 10px; display: flex; justify-content: space-between;">
                 <button id="export-text-btn" class="treehole-btn-hover" style="flex: 1; margin-right: 5px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; padding: 6px 8px; cursor: pointer; font-size: 13px;">导出文本</button>
@@ -550,6 +563,7 @@ function createFloatingPanel() {
     const stopBtn = panel.querySelector('#stop-btn');
     const exportTextBtn = panel.querySelector('#export-text-btn');
     const exportImageBtn = panel.querySelector('#export-image-btn');
+    const batchClassifyBtn = panel.querySelector('#batch-classify-btn');
     const holesContainer = panel.querySelector('#holes-container');
     const loadingDiv = panel.querySelector('.loading');
     const statusText = panel.querySelector('#status-text');
@@ -624,6 +638,7 @@ function createFloatingPanel() {
         sortedHoles.forEach(hole => {
             const holeDiv = document.createElement('div');
             holeDiv.className = 'hole-item treehole-item-hover';
+            holeDiv.setAttribute('data-hole-id', hole.id);
             holeDiv.innerHTML = `
                 <div>
                     <span class="hole-id">#${hole.id}</span>
@@ -631,6 +646,7 @@ function createFloatingPanel() {
                     <span class="reply-count">评论数：${hole.replyCount}</span>
                     <span class="publish-time">${hole.publishTime}</span>
                     ${hole.hasImage ? '<span class="has-image"><i class="icon-image"></i>含图片</span>' : ''}
+                    <span class="category-label" style="margin-left: 8px; color: #9C27B0; font-size: 12px;"></span>
                 </div>
                 <div class="content">${hole.content}</div>
             `;
@@ -784,6 +800,156 @@ function createFloatingPanel() {
             updateStatus(`已收集 ${holesData.length} 条数据，用时 ${elapsedTime.toFixed(0)} 秒${lastTime ? '，最后帖子发布于 ' + lastTime : ''}`);
         }
     }, 1000);
+
+    // 添加批量分类按钮的事件监听
+    batchClassifyBtn.addEventListener('click', async () => {
+        // 如果正在分类，则停止分类
+        if (isClassifying) {
+            stopClassifying();
+            return;
+        }
+        
+        try {
+            const apiSettings = await getApiSettings();
+            if (!apiSettings.apiKey) {
+                throw new Error('请先在设置中配置API Key');
+            }
+            
+            if (holesData.length === 0) {
+                throw new Error('暂无数据，请先收集树洞数据');
+            }
+            
+            // 开始分类
+            startClassifying(apiSettings.apiKey);
+            
+        } catch (error) {
+            alert('批量分类失败: ' + error.message);
+        }
+    });
+    
+    // 开始分类的函数
+    function startClassifying(apiKey) {
+        if (isClassifying) return;
+        
+        isClassifying = true;
+        classifiedCount = 0;
+        
+        // 更改按钮文本
+        batchClassifyBtn.textContent = '停止分类';
+        batchClassifyBtn.style.backgroundColor = '#d32f2f';
+        
+        // 获取当前排序方式下的树洞顺序
+        const sortMethod = panel.querySelector('#sort-method').value;
+        const sortedHoles = [...holesData];
+        
+        // 根据选择的方式排序
+        switch (sortMethod) {
+            case 'like':
+                sortedHoles.sort((a, b) => b.likeCount - a.likeCount);
+                break;
+            case 'reply':
+                sortedHoles.sort((a, b) => b.replyCount - a.replyCount);
+                break;
+            case 'time':
+                sortedHoles.sort((a, b) => {
+                    const timeA = a.publishTime.split(' ').reverse().join(' ');
+                    const timeB = b.publishTime.split(' ').reverse().join(' ');
+                    return timeB.localeCompare(timeA);
+                });
+                break;
+            case 'comprehensive':
+                sortedHoles.sort((a, b) => {
+                    const scoreA = a.likeCount * a.replyCount;
+                    const scoreB = b.likeCount * b.replyCount;
+                    return scoreB - scoreA;
+                });
+                break;
+        }
+        
+        // 优化的分类处理逻辑
+        let currentIndex = 0;
+        
+        // 处理下一个树洞的函数
+        async function processNextHole() {
+            // 检查是否需要停止
+            if (!isClassifying || currentIndex >= sortedHoles.length) {
+                if (isClassifying) {
+                    stopClassifying(true);
+                }
+                return;
+            }
+            
+            // 获取当前树洞
+            const hole = sortedHoles[currentIndex++];
+            const holeElement = document.querySelector(`[data-hole-id="${hole.id}"]`);
+            
+            if (holeElement) {
+                const categoryLabel = holeElement.querySelector('.category-label');
+                
+                // 检查是否已经分类
+                if (categoryLabel && categoryLabel.textContent.trim()) {
+                    // 已经分类，立即跳过并处理下一条
+                    updateStatus(`正在批量分类...已处理 ${currentIndex}/${sortedHoles.length} 条，跳过已分类树洞 #${hole.id}`);
+                    processNextHole(); // 立即处理下一条
+                    return;
+                }
+                
+                try {
+                    // 执行分类 (这里会等待API响应)
+                    const category = await classifyTreehole(hole.content, apiKey);
+                    
+                    // 更新分类标签
+                    if (categoryLabel) {
+                        categoryLabel.textContent = `[${category}]`;
+                        classifiedCount++;
+                        totalClassifiedCount++;
+                        
+                        // 更新状态
+                        updateStatus(`正在批量分类...已分类 ${classifiedCount} 条（总计 ${totalClassifiedCount} 条），当前处理 #${hole.id}`);
+                    }
+                    
+                    // 延迟1秒后处理下一条，避免API请求过于频繁
+                    setTimeout(processNextHole, 1000);
+                } catch (error) {
+                    console.error(`分类失败 (ID: ${hole.id}):`, error);
+                    updateStatus(`分类树洞 #${hole.id} 失败: ${error.message}`, true);
+                    
+                    // 延迟1秒后处理下一条，即使失败也要继续
+                    setTimeout(processNextHole, 1000);
+                }
+            } else {
+                // 找不到元素，立即处理下一条
+                processNextHole();
+            }
+        }
+        
+        // 开始处理
+        processNextHole();
+    }
+    
+    // 停止分类的函数
+    function stopClassifying(completed = false) {
+        if (!isClassifying) return;
+        
+        isClassifying = false;
+        
+        // 清除定时器
+        if (classifyInterval) {
+            clearInterval(classifyInterval);
+            classifyInterval = null;
+        }
+        
+        // 恢复按钮状态
+        batchClassifyBtn.textContent = '批量分类';
+        batchClassifyBtn.style.backgroundColor = '#9C27B0';
+        
+        // 更新状态
+        if (completed) {
+            updateStatus(`批量分类完成，本次共分类 ${classifiedCount} 条树洞`);
+        } else {
+            updateStatus(`批量分类已停止，本次已分类 ${classifiedCount} 条树洞`);
+        }
+    }
 }
 
 // 在原有代码后面添加新的函数
@@ -3178,6 +3344,55 @@ async function summarizeWithDeepSeekAI(content, apiKey, model = 'deepseek-chat')
         return data.choices[0].message.content || '无法获取总结结果';
     } catch (error) {
         console.error('调用DeepSeek API失败:', error);
+        throw error;
+    }
+}
+
+async function classifyTreehole(content, apiKey) {
+    const categories = [
+        "脱单", "交友", "情感", "学习", "生活", "其他"
+    ];
+    
+    const prompt = `请判断以下树洞内容属于哪个类别，只需回复类别名称，不要解释：
+类别选项：${categories.join("、")}
+
+树洞内容：
+${content}`;
+
+    try {
+        const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: 'glm-4-flash',
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ],
+                temperature: 0.1
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`API请求失败: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const classification = data.choices[0].message.content.trim();
+        
+        // 验证返回的分类是否在预定义类别中
+        if (!categories.includes(classification)) {
+            return "其他";
+        }
+        
+        return classification;
+    } catch (error) {
+        console.error('分类失败:', error);
         throw error;
     }
 }
