@@ -896,8 +896,14 @@ function createFloatingPanel() {
                 
                 try {
                     // 执行分类 (这里会等待API响应)
-                    const category = await classifyTreehole(hole.content, apiKey);
+                    category = await classifyTreehole(hole.content, apiKey);
                     
+                    if (category === 'popi' || category === '交友') {
+                        category = '聊天';
+                    }else if(category === '求助' || category === '提问'){
+                        category = '求助';
+                    }
+
                     // 更新数据中的分类信息
                     hole.category = category;
                     
@@ -3354,7 +3360,7 @@ async function summarizeWithDeepSeekAI(content, apiKey, model = 'deepseek-chat')
 
 async function classifyTreehole(content, apiKey) {
     const categories = [
-        "popi/聊天/交友", "求助", "情感", "学习", "生活", "其他"
+        "popi", "交友", "求助", "提问", "情感", "学习", "生活", "其他"
     ];
     
     const prompt = `请判断以下树洞内容属于哪个类别，只需回复类别名称，不要解释：
