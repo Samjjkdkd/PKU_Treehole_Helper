@@ -609,31 +609,8 @@ function createFloatingPanel() {
         holesContainer.innerHTML = '';
         const sortMethod = panel.querySelector('#sort-method').value;
 
-        // 根据选择的方式排序
-        let sortedHoles = [...holes];
-        switch (sortMethod) {
-            case 'like':
-                sortedHoles.sort((a, b) => b.likeCount - a.likeCount);
-                break;
-            case 'reply':
-                sortedHoles.sort((a, b) => b.replyCount - a.replyCount);
-                break;
-            case 'time':
-                sortedHoles.sort((a, b) => {
-                    const timeA = a.publishTime.split(' ').reverse().join(' ');
-                    const timeB = b.publishTime.split(' ').reverse().join(' ');
-                    return timeB.localeCompare(timeA);
-                });
-                break;
-            case 'comprehensive':
-                // 按照收藏量乘以评论量的综合指标排序
-                sortedHoles.sort((a, b) => {
-                    const scoreA = a.likeCount * a.replyCount;
-                    const scoreB = b.likeCount * b.replyCount;
-                    return scoreB - scoreA; // 降序排列
-                });
-                break;
-        }
+        // 使用排序函数
+        const sortedHoles = sortHolesByMethod(holes, sortMethod);
 
         sortedHoles.forEach(hole => {
             const holeDiv = document.createElement('div');
@@ -641,7 +618,7 @@ function createFloatingPanel() {
             holeDiv.setAttribute('data-hole-id', hole.id);
             holeDiv.innerHTML = `
                 <div>
-                    <span class="category-label" style="margin-left: 8px; color: #9C27B0; font-size: 12px;">${hole.category ? `[${hole.category}]` : ''}</span>
+                    ${hole.category ? `<span class="category-tag" style="display: inline-flex; align-items: center; padding: 2px 5px; border-radius: 4px; margin-right: 5px; font-size: 12px; background-color: ${getCategoryColor(hole.category)}; color: white;">${getCategoryIcon(hole.category)} ${hole.category}</span>` : ''}
                     <span class="hole-id">#${hole.id}</span>
                     <span class="like-count">收藏数：${hole.likeCount}</span>
                     <span class="reply-count">评论数：${hole.replyCount}</span>
@@ -826,6 +803,34 @@ function createFloatingPanel() {
             alert('批量分类失败: ' + error.message);
         }
     });
+
+    // 添加获取分类颜色的函数
+    function getCategoryColor(category) {
+        const colorMap = {
+            '交友': '#E91E63', // 粉色
+            '求助': '#2196F3', // 蓝色
+            '情感': '#F44336', // 红色
+            '学习': '#4CAF50', // 绿色
+            '生活': '#FF9800', // 橙色
+            '其他': '#9E9E9E'  // 灰色
+        };
+        
+        return colorMap[category] || '#9C27B0'; // 默认紫色
+    }
+
+    // 添加获取分类图标的函数
+    function getCategoryIcon(category) {
+        const iconMap = {
+            '脱单': '❤️',
+            '交友': '👋',
+            '情感': '😊',
+            '学习': '📚',
+            '生活': '🏠',
+            '其他': '📌'
+        };
+        
+        return iconMap[category] || '📌'; // 默认图标
+    }
     
     // 开始分类的函数
     function startClassifying(apiKey) {
@@ -840,31 +845,7 @@ function createFloatingPanel() {
         
         // 获取当前排序方式下的树洞顺序
         const sortMethod = panel.querySelector('#sort-method').value;
-        const sortedHoles = [...holesData];
-        
-        // 根据选择的方式排序
-        switch (sortMethod) {
-            case 'like':
-                sortedHoles.sort((a, b) => b.likeCount - a.likeCount);
-                break;
-            case 'reply':
-                sortedHoles.sort((a, b) => b.replyCount - a.replyCount);
-                break;
-            case 'time':
-                sortedHoles.sort((a, b) => {
-                    const timeA = a.publishTime.split(' ').reverse().join(' ');
-                    const timeB = b.publishTime.split(' ').reverse().join(' ');
-                    return timeB.localeCompare(timeA);
-                });
-                break;
-            case 'comprehensive':
-                sortedHoles.sort((a, b) => {
-                    const scoreA = a.likeCount * a.replyCount;
-                    const scoreB = b.likeCount * b.replyCount;
-                    return scoreB - scoreA;
-                });
-                break;
-        }
+        const sortedHoles = sortHolesByMethod(holesData, sortMethod);
         
         // 优化的分类处理逻辑
         let currentIndex = 0;
@@ -884,10 +865,10 @@ function createFloatingPanel() {
             const holeElement = document.querySelector(`[data-hole-id="${hole.id}"]`);
             
             if (holeElement) {
-                const categoryLabel = holeElement.querySelector('.category-label');
+                const categoryLabel = holeElement.querySelector('.category-tag');
                 
                 // 检查是否已经分类
-                if (categoryLabel && categoryLabel.textContent.trim()) {
+                if (hole.category) {
                     // 已经分类，立即跳过并处理下一条
                     updateStatus(`正在批量分类...已处理 ${currentIndex}/${sortedHoles.length} 条，跳过已分类树洞 #${hole.id}`);
                     processNextHole(); // 立即处理下一条
@@ -898,9 +879,10 @@ function createFloatingPanel() {
                     // 执行分类 (这里会等待API响应)
                     category = await classifyTreehole(hole.content, apiKey);
                     
-                    if (category === 'popi' || category === '交友') {
+                    if(category === 'popi'||category === '交友'){
                         category = '聊天';
-                    }else if(category === '求助' || category === '提问'){
+                    }
+                    if(category === '求助'||category === '提问'){
                         category = '求助';
                     }
 
@@ -909,13 +891,34 @@ function createFloatingPanel() {
                     
                     // 更新分类标签
                     if (categoryLabel) {
-                        categoryLabel.textContent = `[${category}]`;
-                        classifiedCount++;
-                        totalClassifiedCount++;
-                        
-                        // 更新状态
-                        updateStatus(`正在批量分类...已分类 ${classifiedCount} 条（总计 ${totalClassifiedCount} 条），当前处理 #${hole.id}`);
+                        categoryLabel.innerHTML = `${getCategoryIcon(category)} ${category}`;
+                        categoryLabel.style.backgroundColor = getCategoryColor(category);
+                    } else {
+                        // 创建新的分类标签
+                        const headerDiv = holeElement.querySelector('div:first-child');
+                        if (headerDiv) {
+                            const newCategoryTag = document.createElement('span');
+                            newCategoryTag.className = 'category-tag';
+                            newCategoryTag.style.cssText = `display: inline-flex; align-items: center; padding: 2px 5px; border-radius: 4px; margin-right: 5px; font-size: 12px; background-color: ${getCategoryColor(category)}; color: white;`;
+                            newCategoryTag.innerHTML = `${getCategoryIcon(category)} ${category}`;
+                            
+                            // 找到树洞ID元素
+                            const holeIdElement = headerDiv.querySelector('.hole-id');
+                            if (holeIdElement) {
+                                // 插入到树洞ID前面
+                                headerDiv.insertBefore(newCategoryTag, holeIdElement);
+                            } else {
+                                // 如果找不到，就添加到最前面
+                                headerDiv.insertBefore(newCategoryTag, headerDiv.firstChild);
+                            }
+                        }
                     }
+                    
+                    classifiedCount++;
+                    totalClassifiedCount++;
+                    
+                    // 更新状态
+                    updateStatus(`正在批量分类...已分类 ${classifiedCount} 条（总计 ${totalClassifiedCount} 条），当前处理 #${hole.id}`);
                     
                     // 延迟1秒后处理下一条，避免API请求过于频繁
                     setTimeout(processNextHole, 1000);
@@ -2768,29 +2771,7 @@ function exportHolesAsText() {
 
     // 根据当前排序方式排序
     let sortedHoles = [...holesData];
-    switch (sortMethod) {
-        case 'like':
-            sortedHoles.sort((a, b) => b.likeCount - a.likeCount);
-            break;
-        case 'reply':
-            sortedHoles.sort((a, b) => b.replyCount - a.replyCount);
-            break;
-        case 'time':
-            sortedHoles.sort((a, b) => {
-                const timeA = a.publishTime.split(' ').reverse().join(' ');
-                const timeB = b.publishTime.split(' ').reverse().join(' ');
-                return timeB.localeCompare(timeA);
-            });
-            break;
-        case 'comprehensive':
-            // 按照收藏量乘以评论量的综合指标排序
-            sortedHoles.sort((a, b) => {
-                const scoreA = a.likeCount * a.replyCount;
-                const scoreB = b.likeCount * b.replyCount;
-                return scoreB - scoreA; // 降序排列
-            });
-            break;
-    }
+    sortedHoles = sortHolesByMethod(sortedHoles, sortMethod);
 
     // 添加每个树洞的数据
     sortedHoles.forEach((hole, index) => {
@@ -2893,29 +2874,7 @@ function exportHolesAsImage() {
 
     // 根据当前排序方式排序
     let sortedHoles = [...holesData];
-    switch (sortMethod) {
-        case 'like':
-            sortedHoles.sort((a, b) => b.likeCount - a.likeCount);
-            break;
-        case 'reply':
-            sortedHoles.sort((a, b) => b.replyCount - a.replyCount);
-            break;
-        case 'time':
-            sortedHoles.sort((a, b) => {
-                const timeA = a.publishTime.split(' ').reverse().join(' ');
-                const timeB = b.publishTime.split(' ').reverse().join(' ');
-                return timeB.localeCompare(timeA);
-            });
-            break;
-        case 'comprehensive':
-            // 按照收藏量乘以评论量的综合指标排序
-            sortedHoles.sort((a, b) => {
-                const scoreA = a.likeCount * a.replyCount;
-                const scoreB = b.likeCount * b.replyCount;
-                return scoreB - scoreA; // 降序排列
-            });
-            break;
-    }
+    sortedHoles = sortHolesByMethod(sortedHoles, sortMethod);
 
     // 只展示前30条数据，防止图片过大
     const displayHoles = sortedHoles.slice(0, 30);
@@ -3049,6 +3008,34 @@ function getSortMethodName(method) {
         case 'comprehensive': return '按综合关注程度排序';
         default: return '未知排序方式';
     }
+}
+
+// 添加排序函数
+function sortHolesByMethod(holes, method) {
+    const sortedHoles = [...holes];
+    switch (method) {
+        case 'like':
+            sortedHoles.sort((a, b) => b.likeCount - a.likeCount);
+            break;
+        case 'reply':
+            sortedHoles.sort((a, b) => b.replyCount - a.replyCount);
+            break;
+        case 'time':
+            sortedHoles.sort((a, b) => {
+                const timeA = a.publishTime.split(' ').reverse().join(' ');
+                const timeB = b.publishTime.split(' ').reverse().join(' ');
+                return timeB.localeCompare(timeA);
+            });
+            break;
+        case 'comprehensive':
+            sortedHoles.sort((a, b) => {
+                const scoreA = a.likeCount * a.replyCount;
+                const scoreB = b.likeCount * b.replyCount;
+                return scoreB - scoreA;
+            });
+            break;
+    }
+    return sortedHoles;
 }
 
 // 获取导出设置
@@ -3406,5 +3393,3 @@ ${content}`;
         throw error;
     }
 }
-
-
