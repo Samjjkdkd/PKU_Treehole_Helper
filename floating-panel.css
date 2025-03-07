@@ -1,9 +1,9 @@
 #pku-treehole-panel {
     position: fixed;
-    right: -350px;
+    right: -400px;
     top: 50%;
     transform: translateY(-50%);
-    width: 350px;
+    width: 400px;
     background: white;
     box-shadow: -2px 0 10px rgba(0,0,0,0.1);
     transition: right 0.3s ease;

@@ -3042,7 +3042,7 @@ async function summarizeTreehole() {
                 'glm-4-airx': 'GLM-4-AirX',
                 'glm-4-long': 'GLM-4-Long',
                 'glm-4-flashx': 'GLM-4-FlashX',
-                'glm-4-flash': 'GLM-4-Flash(免费)'
+                'glm-4-flash': 'GLM-4-Flash'
             };
             modelDisplayName = modelMap[apiSettings.subModel] || '智谱GLM';
         }
