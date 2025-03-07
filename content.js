@@ -2788,7 +2788,7 @@ function exportHolesAsText() {
 
     // 添加每个树洞的数据
     sortedHoles.forEach((hole, index) => {
-        textContent += `[${index + 1}] ID: #${hole.id} | 收藏数: ${hole.likeCount} | 评论数: ${hole.replyCount} | 发布时间: ${hole.publishTime}\n\n`;
+        textContent += `[${index + 1}] ID: #${hole.id} | 分类: ${hole.category ? `[${hole.category}]` : '未分类'} | 收藏数: ${hole.likeCount} | 评论数: ${hole.replyCount} | 发布时间: ${hole.publishTime}\n\n`;
         textContent += `${hole.content || '无内容'}\n\n`;
         textContent += `-------------------------------\n\n`;
     });
@@ -2927,6 +2927,7 @@ function exportHolesAsImage() {
             <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                 <span style="font-weight: bold; color: #1a73e8;">#${hole.id}</span>
                 <div>
+                    <span style="margin-right: 15px; color: #9C27B0;">[${hole.category ? hole.category : '未分类'}]</span>
                     <span style="margin-right: 15px; color: #e91e63;">收藏数：${hole.likeCount}</span>
                     <span style="margin-right: 15px; color: #2196F3;">评论数：${hole.replyCount}</span>
                     <span style="color: #666;">${hole.publishTime}</span>
@@ -3353,7 +3354,7 @@ async function summarizeWithDeepSeekAI(content, apiKey, model = 'deepseek-chat')
 
 async function classifyTreehole(content, apiKey) {
     const categories = [
-        "脱单", "交友", "情感", "学习", "生活", "其他"
+        "popi/聊天/交友", "求助", "情感", "学习", "生活", "其他"
     ];
     
     const prompt = `请判断以下树洞内容属于哪个类别，只需回复类别名称，不要解释：
