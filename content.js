@@ -1136,7 +1136,7 @@ function showCommentCollectorDialog() {
                             <option value="funny">幽默风趣</option>
                             <option value="empathetic">刻薄嘲讽</option>
                             <option value="direct">简洁直接</option>
-                            <option value="critical">分析问题</option>
+                            <option value="critical">理性分析</option>
                         </select>
                         <button id="refresh-reply" class="hover-effect" style="margin-left: 8px; background-color: #FF5722; color: white; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">刷新</button>
                     </div>
@@ -3457,32 +3457,20 @@ async function generateTreeholeReply() {
         // 显示生成区域
         document.getElementById('reply-generation').style.display = 'block';
         
-        // 获取当前筛选条件
-        const speakerFilter = document.getElementById('speaker-filter');
-        const selectedSpeaker = speakerFilter ? speakerFilter.value : 'all';
-
-        // 提取主贴
-        const mainPost = allCommentsData.find(comment => comment.isMainPost);
+        // 获取所有评论
+        const commentsContainer = document.getElementById('comments-container');
+        const allComments = Array.from(commentsContainer.querySelectorAll('.comment-item')).map(item => {
+            const speaker = item.querySelector('.speaker')?.textContent || '匿名';
+            const content = item.querySelector('.content')?.textContent || '';
+            return `${speaker}: ${content}`;
+        }).join('\n');
         
-        // 筛选评论（根据发言人筛选）
-        let filteredComments = allCommentsData.filter(comment => !comment.isMainPost);
-        if (selectedSpeaker !== 'all') {
-            filteredComments = filteredComments.filter(comment => comment.speaker === selectedSpeaker);
-        }
+        // 获取主贴内容
+        const mainPostContent = document.querySelector('.sidebar-content')?.textContent || '';
         
-        let content = '';
+        // 合并内容
+        const fullContent = `树洞内容: ${mainPostContent}\n\n评论区:\n${allComments}`;
         
-        // 添加主贴内容
-        if (mainPost) {
-            content += `【主贴】${mainPost.content}\n\n`;
-        }
-        
-        // 添加筛选后的评论内容（最多添加50条，防止超出API限制）
-        const maxComments = Math.min(filteredComments.length, 50);
-        for (let i = 0; i < maxComments; i++) {
-            content += `【${filteredComments[i].speaker}】${filteredComments[i].content}\n`;
-        }
-
         // 获取选择的风格
         const replyStyle = document.getElementById('reply-style').value;
         
@@ -3495,9 +3483,9 @@ async function generateTreeholeReply() {
         // 根据当前选择的平台调用不同的API
         let result;
         if (apiSettings.aiPlatform === 'deepseek') {
-            result = await generateReplyWithDeepSeekAI(content, apiSettings.apiKey, replyStyle, apiSettings.subModel);
+            result = await generateReplyWithDeepSeekAI(fullContent, apiSettings.apiKey, replyStyle, apiSettings.subModel);
         } else { // 默认使用智谱AI
-            result = await generateReplyWithZhipuAI(content, apiSettings.apiKey, replyStyle, apiSettings.subModel);
+            result = await generateReplyWithZhipuAI(fullContent, apiSettings.apiKey, replyStyle, apiSettings.subModel);
         }
         
         // 显示结果
