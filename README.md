@@ -19,9 +19,9 @@ PKU TreeHole Helper 是一个专为北大树洞用户设计的浏览器扩展，
 
 ### 安装方法（仅限Chrome和Microsoft Edge用户）
 
-#### 方法一：从 Chrome 网上应用店安装（推荐）
+#### 方法一：从 Chrome 网上应用店安装（待发布)
 
-1. 访问 Chrome 网上应用店中的 PKU TreeHole Helper 页面（待发布）
+1. 访问 Chrome 网上应用店中的 PKU TreeHole Helper 页面
 2. 点击"添加至 Chrome"按钮
 3. 在弹出的确认窗口中点击"添加扩展程序"
 
