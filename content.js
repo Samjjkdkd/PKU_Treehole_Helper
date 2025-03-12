@@ -1140,6 +1140,13 @@ function showCommentCollectorDialog() {
                         </select>
                         <button id="refresh-reply" class="hover-effect" style="margin-left: 8px; background-color: #FF5722; color: white; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">刷新</button>
                     </div>
+                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                        <label for="reply-target" style="margin-right: 8px; font-size: 13px;">回复对象：</label>
+                        <select id="reply-target" style="flex-grow: 1; padding: 5px; border-radius: 4px; border: 1px solid #ddd; font-size: 13px;">
+                            <option value="all">整体讨论</option>
+                            <option value="author">原帖作者</option>
+                        </select>
+                    </div>
                     <div id="generated-reply" style="margin-top: 5px; padding: 8px; background-color: white; border-radius: 4px; border: 1px solid #FFE0B2; font-size: 13px;">
                         点击"生成回复"按钮自动创建回复...
                     </div>
@@ -2292,10 +2299,13 @@ function updateSpeakerFilter() {
     
     // 保存当前选中的值
     const speakerFilter = document.getElementById('speaker-filter');
-    // 默认值设为'all'，即全部评论
-    const selectedValue = speakerFilter && speakerFilter.value ? speakerFilter.value : 'all';
+    const replyTargetFilter = document.getElementById('reply-target');
     
-    // 清空下拉框
+    // 默认值设为'all'，即全部评论
+    const selectedSpeakerValue = speakerFilter && speakerFilter.value ? speakerFilter.value : 'all';
+    const selectedReplyTargetValue = replyTargetFilter && replyTargetFilter.value ? replyTargetFilter.value : 'all';
+    
+    // 清空"只看"下拉框
     if (speakerFilter) {
         speakerFilter.innerHTML = '';
         
@@ -2307,29 +2317,62 @@ function updateSpeakerFilter() {
         const nonMainPostComments = allCommentsData.filter(comment => !comment.isMainPost);
         allOption.textContent = `全部 (${nonMainPostComments.length}条)`;
         speakerFilter.appendChild(allOption);
+    }
+    
+    // 清空"回复对象"下拉框
+    if (replyTargetFilter) {
+        replyTargetFilter.innerHTML = '';
         
-        // 遍历评论获取发言者，排除主贴
-        allCommentsData.forEach(comment => {
-            if (!comment.isMainPost && comment.speaker && !speakers.has(comment.speaker)) {
-                speakers.add(comment.speaker);
-            }
-        });
+        // 添加"整体讨论"选项
+        const allOption = document.createElement('option');
+        allOption.value = 'all';
+        allOption.textContent = '整体讨论';
+        replyTargetFilter.appendChild(allOption);
         
-        // 为每个发言者创建一个选项
-        speakers.forEach(speaker => {
-            const option = document.createElement('option');
-            option.value = speaker;
+        // 添加"洞主"选项 - 这里我们使用固定的"author"值来表示洞主
+        const authorOption = document.createElement('option');
+        authorOption.value = 'author';
+        authorOption.textContent = '洞主';
+        replyTargetFilter.appendChild(authorOption);
+    }
+    
+    // 遍历评论获取发言者，排除主贴
+    allCommentsData.forEach(comment => {
+        if (!comment.isMainPost && comment.speaker && !speakers.has(comment.speaker)) {
+            speakers.add(comment.speaker);
+        }
+    });
+    
+    // 为每个发言者创建选项并添加到两个下拉框中
+    speakers.forEach(speaker => {
+        // 计算该发言者的评论数，排除主贴
+        const speakerCommentCount = allCommentsData.filter(comment => 
+            !comment.isMainPost && comment.speaker === speaker).length;
             
-            // 计算该发言者的评论数，排除主贴
-            const speakerCommentCount = allCommentsData.filter(comment => 
-                !comment.isMainPost && comment.speaker === speaker).length;
-            
-            option.textContent = `${speaker} (${speakerCommentCount}条)`;
-            speakerFilter.appendChild(option);
-        });
+        // 为"只看"下拉框添加选项
+        if (speakerFilter) {
+            const speakerOption = document.createElement('option');
+            speakerOption.value = speaker;
+            speakerOption.textContent = `${speaker} (${speakerCommentCount}条)`;
+            speakerFilter.appendChild(speakerOption);
+        }
         
-        // 恢复选中的值，确保默认是'all'
-        speakerFilter.value = selectedValue;
+        // 为"回复对象"下拉框添加选项，但跳过"洞主"（因为已经添加过固定的洞主选项）
+        if (replyTargetFilter && speaker !== '洞主') {
+            const replyOption = document.createElement('option');
+            replyOption.value = speaker;
+            replyOption.textContent = speaker;
+            replyTargetFilter.appendChild(replyOption);
+        }
+    });
+    
+    // 恢复选中的值
+    if (speakerFilter) {
+        speakerFilter.value = selectedSpeakerValue;
+    }
+    
+    if (replyTargetFilter) {
+        replyTargetFilter.value = selectedReplyTargetValue;
     }
 }
 
@@ -3457,22 +3500,59 @@ async function generateTreeholeReply() {
         // 显示生成区域
         document.getElementById('reply-generation').style.display = 'block';
         
-        // 获取所有评论
-        const commentsContainer = document.getElementById('comments-container');
-        const allComments = Array.from(commentsContainer.querySelectorAll('.comment-item')).map(item => {
-            const speaker = item.querySelector('.speaker')?.textContent || '匿名';
-            const content = item.querySelector('.content')?.textContent || '';
-            return `${speaker}: ${content}`;
-        }).join('\n');
-        
         // 获取主贴内容
-        const mainPostContent = document.querySelector('.sidebar-content')?.textContent || '';
+        const mainPost = allCommentsData.find(comment => comment.isMainPost);
+        const mainPostContent = mainPost ? mainPost.content : '';
         
-        // 合并内容
-        const fullContent = `树洞内容: ${mainPostContent}\n\n评论区:\n${allComments}`;
+        // 获取回复对象
+        const replyTarget = document.getElementById('reply-target')?.value || 'all';
         
-        // 获取选择的风格
+        // 获取回复风格
         const replyStyle = document.getElementById('reply-style').value;
+        
+        let contentToProcess;
+        let promptPrefix = '';
+        
+        if (replyTarget === 'all') {
+            // 获取当前筛选条件
+            const speakerFilter = document.getElementById('speaker-filter');
+            const selectedSpeaker = speakerFilter ? speakerFilter.value : 'all';
+            
+            // 筛选评论（不包括主贴）
+            let filteredComments = allCommentsData.filter(comment => !comment.isMainPost);
+            
+            // 根据发言者筛选普通评论
+            if (selectedSpeaker !== 'all') {
+                filteredComments = filteredComments.filter(comment => 
+                    comment.speaker === selectedSpeaker);
+            }
+            
+            // 将评论格式化为字符串
+            const visibleComments = filteredComments.map(comment => 
+                `${comment.speaker || '匿名'}: ${comment.content || ''}`
+            ).join('\n');
+            
+            contentToProcess = `树洞内容: ${mainPostContent}\n\n评论区:\n${visibleComments}`;
+            promptPrefix = '请根据整体讨论内容生成一条适合发布在评论区的回复。';
+        } 
+        else if (replyTarget === 'author') {
+            // 回复洞主：只包含主贴
+            contentToProcess = `树洞内容: ${mainPostContent}`;
+            promptPrefix = `请生成一条回复洞主的评论。`;
+        } 
+        else {
+            // 回复特定用户：筛选该用户的所有评论
+            const targetComments = allCommentsData.filter(comment => 
+                !comment.isMainPost && comment.speaker === replyTarget
+            ).map(comment => `${comment.speaker}: ${comment.content}`).join('\n');
+            
+            if (!targetComments) {
+                throw new Error(`未找到用户 "${replyTarget}" 的评论`);
+            }
+            
+            contentToProcess = `树洞内容: ${mainPostContent}\n\n${replyTarget}的评论:\n${targetComments}`;
+            promptPrefix = `请针对用户"${replyTarget}"的评论生成一条回复。`;
+        }
         
         // 获取API设置
         const apiSettings = await getApiSettings();
@@ -3483,9 +3563,9 @@ async function generateTreeholeReply() {
         // 根据当前选择的平台调用不同的API
         let result;
         if (apiSettings.aiPlatform === 'deepseek') {
-            result = await generateReplyWithDeepSeekAI(fullContent, apiSettings.apiKey, replyStyle, apiSettings.subModel);
+            result = await generateReplyWithDeepSeekAI(contentToProcess, apiSettings.apiKey, replyStyle, apiSettings.subModel, promptPrefix);
         } else { // 默认使用智谱AI
-            result = await generateReplyWithZhipuAI(fullContent, apiSettings.apiKey, replyStyle, apiSettings.subModel);
+            result = await generateReplyWithZhipuAI(contentToProcess, apiSettings.apiKey, replyStyle, apiSettings.subModel, promptPrefix);
         }
         
         // 显示结果
@@ -3502,7 +3582,7 @@ async function generateTreeholeReply() {
 }
 
 // 使用DeepSeek AI生成回复
-async function generateReplyWithDeepSeekAI(content, apiKey, style, model = 'deepseek-chat') {
+async function generateReplyWithDeepSeekAI(content, apiKey, style, model = 'deepseek-chat', promptPrefix = '') {
     try {
         const apiUrl = 'https://api.deepseek.com/v1/chat/completions';
         
@@ -3527,7 +3607,10 @@ async function generateReplyWithDeepSeekAI(content, apiKey, style, model = 'deep
                 break;
         }
         
-        const prompt = `请你阅读以下PKU树洞内容及其评论，然后${styleInstruction}生成一句适合发布在评论区的回复。回复需要自然、不要太长，最好在50字以内：\n\n${content}`;
+        const prompt = `${promptPrefix}\n请你阅读以下PKU树洞内容及其评论，
+        然后${styleInstruction}生成一句发布在评论区的回复。
+        回复需要自然、合理、针对性强，不要太短，最好在50字以上。\n\n
+        注意：请直接给出回复内容，回复中不要出现如"洞主"、"Alice"等用户的名字。\n\n${content}`;
         
         const response = await fetch(apiUrl, {
             method: 'POST',
@@ -3547,19 +3630,11 @@ async function generateReplyWithDeepSeekAI(content, apiKey, style, model = 'deep
                 max_tokens: 200
             })
         });
-        
+
         if (!response.ok) {
-            if (response.status === 402) {
-                throw new Error('DeepSeek API余额不足或API Key无效，请检查API Key或账户余额');
-            } else if (response.status === 401) {
-                throw new Error('DeepSeek API认证失败，请检查API Key是否正确');
-            } else if (response.status === 429) {
-                throw new Error('DeepSeek API请求频率超限，请稍后再试');
-            } else {
-                throw new Error(`API请求失败: ${response.status}`);
-            }
+            throw new Error(`API请求失败: ${response.status}`);
         }
-        
+
         const data = await response.json();
         return data.choices[0].message.content || '无法生成回复';
     } catch (error) {
@@ -3569,7 +3644,7 @@ async function generateReplyWithDeepSeekAI(content, apiKey, style, model = 'deep
 }
 
 // 使用智谱AI生成回复
-async function generateReplyWithZhipuAI(content, apiKey, style, model = 'glm-4-flash') {
+async function generateReplyWithZhipuAI(content, apiKey, style, model = 'glm-4-flash', promptPrefix = '') {
     try {
         // 根据不同风格设置不同的prompt
         let styleInstruction;
@@ -3592,7 +3667,10 @@ async function generateReplyWithZhipuAI(content, apiKey, style, model = 'glm-4-f
                 break;
         }
         
-        const prompt = `请你阅读以下树洞内容及其评论，然后对评论区中的某个人${styleInstruction}生成一句回复。回复需要自然、不要太长，最好在50字以内：\n\n${content}`;
+        const prompt = `${promptPrefix}\n请你阅读以下PKU树洞内容及其评论，
+        然后${styleInstruction}生成一句发布在评论区的回复。
+        回复需要自然、合理、针对性强，不要太短，最好在50字以上。\n\n
+        注意：请直接给出回复内容，回复中不要出现如"洞主"、"Alice"等用户的名字。\n\n${content}`;
         
         const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
             method: 'POST',
