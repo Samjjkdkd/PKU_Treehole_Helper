@@ -2849,7 +2849,8 @@ function exportHolesAsText() {
     const sortMethod = document.querySelector('#sort-method').value;
 
     // 生成文本内容
-    let textContent = `# PKU树洞数据导出\n`;
+    let textContent = ``;
+    //textContent += `# PKU树洞数据导出\n`;
     textContent += `# 导出时间：${new Date().toLocaleString()}\n`;
     textContent += `# 帖子数量：${holesData.length}\n`;
     textContent += `# 排序方式：${getSortMethodName(sortMethod)}\n`;
@@ -2872,9 +2873,11 @@ function exportHolesAsText() {
 
     // 添加每个树洞的数据
     sortedHoles.forEach((hole, index) => {
-        textContent += `[${index + 1}] ID: #${hole.id} | 分类: ${hole.category ? `[${hole.category}]` : '未分类'} | 收藏数: ${hole.likeCount} | 评论数: ${hole.replyCount} | 发布时间: ${hole.publishTime}\n\n`;
-        textContent += `${hole.content || '无内容'}\n\n`;
-        textContent += `-------------------------------\n\n`;
+        //textContent += `[${index + 1}] ID: #${hole.id} | 分类: ${hole.category ? `[${hole.category}]` : '未分类'} | 收藏数: ${hole.likeCount} | 评论数: ${hole.replyCount} | 发布时间: ${hole.publishTime}\n\n`;
+        //textContent += `${hole.content || '无内容'}\n\n`;
+        //textContent += `-------------------------------\n\n`;
+        textContent += `#${hole.id} | 收藏:${hole.likeCount} | 评论:${hole.replyCount} | ${hole.publishTime}\n`;
+        textContent += `${(hole.content || '无内容').replace(/\n/g, ' ').replace(/\r/g, ' ').slice(0,20)}\n`;
     });
 
     // 获取导出设置并执行导出
