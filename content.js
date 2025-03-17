@@ -16,6 +16,7 @@ let tabElement = null; // tab元素引用
 
 // 全局状态更新函数
 function updateGlobalStatus(text, isError = false) {
+    console.log("[DEBUG] updateGlobalStatus 被调用");
     if (statusTextElement) {
         statusTextElement.style.display = 'block';
         statusTextElement.style.background = isError ? '#ffebee' : '#e8f5e9';
@@ -27,7 +28,7 @@ function updateGlobalStatus(text, isError = false) {
 
 // 检查并应用主题颜色到tab
 function applyThemeToTab() {
-
+    console.log("[DEBUG] applyThemeToTab 被调用");
     // 检查是否存在root-dark-mode类
     const appElement = document.getElementById('app');
     const hasRootDarkMode = appElement && appElement.classList.contains('root-dark-mode');
@@ -70,6 +71,7 @@ let totalClassifiedCount = 0; // 总共分类的数量（包括此次和之前�
 
 // 自动滚动函数
 function autoScroll() {
+    console.log("[DEBUG] autoScroll 被调用");
     if (isScrolling) return;
 
     isScrolling = true;
@@ -127,6 +129,7 @@ function autoScroll() {
 
 // 处理帖子数据
 function processHoles() {
+    console.log("[DEBUG] processHoles 被调用");
     const holes = document.querySelectorAll('.flow-item-row');
     let newHolesCount = 0;
     let reachedTimeLimit = false;
@@ -232,6 +235,7 @@ const mutationObserver = new MutationObserver((mutations) => {
 
 // 初始化页面监视器
 function initPageObserver() {
+    console.log("[DEBUG] initPageObserver 被调用");
     // 监听整个页面的变化
     mutationObserver.observe(document.body, {
         childList: true,
@@ -243,12 +247,14 @@ function initPageObserver() {
 
 // 加载初始数据
 function loadInitialData() {
+    console.log("[DEBUG] loadInitialData 被调用");
     processHoles();
     console.log("[PKU TreeHole] 已处理初始可见帖子");
 }
 
 // 开始收集数据
 function startCollection(options) {
+    console.log("[DEBUG] startCollection 被调用");
     console.log("[PKU TreeHole] 开始收集数据，时间限制:", options.timeLimit / 1000, "秒，数量限制:", options.postsLimit);
 
     // 如果正在收集中，先停止当前收集
@@ -291,6 +297,7 @@ function startCollection(options) {
 
 // 停止收集数据
 function stopCollection(updateUI = false, reason = '') {
+    console.log("[DEBUG] stopCollection 被调用");
     console.log("[PKU TreeHole] 停止收集，共收集到", holesData.length, "条帖子", reason ? `，原因: ${reason}` : '');
 
     isCollecting = false;
@@ -411,6 +418,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 
 // 在文件开头添加面板创建代码
 function createFloatingPanel() {
+    console.log("[DEBUG] createFloatingPanel 被调用");
     // 创建通用的按钮悬浮效果样式
     const floatingPanelStyles = document.createElement('style');
     floatingPanelStyles.textContent = `
@@ -596,11 +604,13 @@ function createFloatingPanel() {
     });
 
     function updateStatus(text, isError = false) {
+        console.log("[DEBUG] updateStatus 被调用");
         statusTextElement = statusText; // 保存对状态文本元素的引用
         updateGlobalStatus(text, isError);
     }
 
     function displayHoles(holes) {
+        console.log("[DEBUG] displayHoles 被调用");
         if (!holes || holes.length === 0) {
             holesContainer.innerHTML = '<div class="no-data">暂无数据，请点击"开始收集数据"</div>';
             return;
@@ -806,6 +816,7 @@ function createFloatingPanel() {
 
     // 添加获取分类颜色的函数
     function getCategoryColor(category) {
+        console.log("[DEBUG] getCategoryColor 被调用");
         const colorMap = {
             '交友': '#E91E63', // 粉色
             '求助': '#2196F3', // 蓝色
@@ -820,6 +831,7 @@ function createFloatingPanel() {
 
     // 添加获取分类图标的函数
     function getCategoryIcon(category) {
+        console.log("[DEBUG] getCategoryIcon 被调用");
         const iconMap = {
             '脱单': '❤️',
             '交友': '👋',
@@ -834,6 +846,7 @@ function createFloatingPanel() {
     
     // 开始分类的函数
     function startClassifying(apiKey) {
+        console.log("[DEBUG] startClassifying 被调用");
         if (isClassifying) return;
         
         isClassifying = true;
@@ -852,6 +865,7 @@ function createFloatingPanel() {
         
         // 处理下一个树洞的函数
         async function processNextHole() {
+            console.log("[DEBUG] processNextHole 被调用");
             // 检查是否需要停止
             if (!isClassifying || currentIndex >= sortedHoles.length) {
                 if (isClassifying) {
@@ -941,6 +955,7 @@ function createFloatingPanel() {
     
     // 停止分类的函数
     function stopClassifying(completed = false) {
+        console.log("[DEBUG] stopClassifying 被调用");
         if (!isClassifying) return;
         
         isClassifying = false;
@@ -966,6 +981,7 @@ function createFloatingPanel() {
 
 // 在原有代码后面添加新的函数
 function createCommentCollectorButton() {
+    console.log("[DEBUG] createCommentCollectorButton 被调用");
     // 检查当前是否在树洞详情页
     const sidebarTitle = document.querySelector('.sidebar-title.sidebar-top');
     if (!sidebarTitle) return;
@@ -1006,6 +1022,7 @@ function createCommentCollectorButton() {
 
 // 创建评论收集对话框
 function showCommentCollectorDialog() {
+    console.log("[DEBUG] showCommentCollectorDialog 被调用");
     // 检查是否已存在对话框
     let dialog = document.getElementById('comment-collector-dialog');
     if (dialog) {
@@ -1347,6 +1364,7 @@ function showCommentCollectorDialog() {
 
 // 收集评论
 function collectComments(isInitialCollection = false) {
+    console.log("[DEBUG] collectComments 被调用");
     // 获取评论容器
     const commentsContainer = document.querySelector(".sidebar-content");
     if (!commentsContainer) {
@@ -1535,6 +1553,7 @@ function collectComments(isInitialCollection = false) {
 
 // 专门处理第一条帖子（树洞主贴）的函数
 function extractMainPostData(postElement) {
+    console.log("[DEBUG] extractMainPostData 被调用");
     try {
         // 获取帖子ID
         const idElement = postElement.querySelector('.box-id');
@@ -1613,6 +1632,7 @@ function extractMainPostData(postElement) {
 
 // 提取评论数据
 function extractCommentData(commentElement) {
+    console.log("[DEBUG] extractCommentData 被调用");
     try {
         // 获取评论ID
         const idElement = commentElement.querySelector('.box-id');
@@ -1708,6 +1728,7 @@ function extractCommentData(commentElement) {
 
 // 显示评论数据
 function displayComments(comments, container) {
+    console.log("[DEBUG] displayComments 被调用");
     if (!container) return;
 
     // 确保在显示评论前清空容器
@@ -1836,6 +1857,7 @@ function displayComments(comments, container) {
 
 // 辅助函数：为发言人获取颜色
 function getColorForSpeaker(speaker, colorMap) {
+    console.log("[DEBUG] getColorForSpeaker 被调用");
     if (colorMap[speaker]) {
         return colorMap[speaker];
     }
@@ -1858,6 +1880,7 @@ function getColorForSpeaker(speaker, colorMap) {
 
 // 监听页面变化，动态添加评论收集按钮
 function observeSidebarChanges() {
+    console.log("[DEBUG] observeSidebarChanges 被调用");
     const observer = new MutationObserver((mutations) => {
         createCommentCollectorButton();
     });
@@ -1873,6 +1896,7 @@ function observeSidebarChanges() {
 
 // 添加样式
 function addCommentCollectorStyles() {
+    console.log("[DEBUG] addCommentCollectorStyles 被调用");
     const style = document.createElement('style');
     style.textContent = `
         .comment-collector-btn:hover {
@@ -1938,6 +1962,7 @@ function addCommentCollectorStyles() {
 
 // 开始自动滚动评论页面
 function startCommentsAutoScroll() {
+    console.log("[DEBUG] startCommentsAutoScroll 被调用");
     if (isCommentsScrolling) return;
 
     isCommentsScrolling = true;
@@ -2025,6 +2050,7 @@ function startCommentsAutoScroll() {
 
 // 停止自动滚动评论页面
 function stopCommentsAutoScroll(updateCheckbox = true) {
+    console.log("[DEBUG] stopCommentsAutoScroll 被调用");
     if (commentsScrollInterval) {
         clearInterval(commentsScrollInterval);
         commentsScrollInterval = null;
@@ -2044,12 +2070,14 @@ function stopCommentsAutoScroll(updateCheckbox = true) {
 
 // 检查是否已滚动到容器底部
 function isScrolledToBottom(element) {
+    console.log("[DEBUG] isScrolledToBottom 被调用");
     // 当滚动位置 + 可视高度 >= 总滚动高度 - 5像素（容差）时，认为已滚动到底部
     return element.scrollTop + element.clientHeight >= element.scrollHeight - 5;
 }
 
 // 更新评论收集器状态显示
 function updateCommentCollectorStatus(text, isError = false) {
+    console.log("[DEBUG] updateCommentCollectorStatus 被调用");
     const statusElement = document.getElementById('comment-collector-status');
     if (statusElement) {
         statusElement.textContent = text;
@@ -2059,6 +2087,7 @@ function updateCommentCollectorStatus(text, isError = false) {
 
 // 开始收集评论
 function startCollectComments() {
+    console.log("[DEBUG] startCollectComments 被调用");
     if (isCollectingComments) return;
 
     // 重置变量
@@ -2185,6 +2214,7 @@ function startCollectComments() {
 
 // 停止收集评论
 function stopCollectComments() {
+    console.log("[DEBUG] stopCollectComments 被调用");
     if (!isCollectingComments) return;
 
     isCollectingComments = false;
@@ -2252,6 +2282,7 @@ function stopCollectComments() {
 
 // 更新评论统计信息
 function updateCommentStats(count, timeInSeconds, latestTime) {
+    console.log("[DEBUG] updateCommentStats 被调用");
     const countElement = document.getElementById('comment-count');
     const timeElement = document.getElementById('collection-time');
     const latestTimeElement = document.getElementById('earliest-comment-time');
@@ -2270,6 +2301,7 @@ function updateCommentStats(count, timeInSeconds, latestTime) {
 
 // 更新收集用时
 function updateCollectionTime(timeInSeconds) {
+    console.log("[DEBUG] updateCollectionTime 被调用");
     const timeElement = document.getElementById('collection-time');
     if (timeElement) {
         timeElement.textContent = formatTime(timeInSeconds);
@@ -2278,6 +2310,7 @@ function updateCollectionTime(timeInSeconds) {
 
 // 格式化时间
 function formatTime(seconds) {
+    console.log("[DEBUG] formatTime 被调用");
     if (seconds < 60) {
         return `${seconds}秒`;
     } else if (seconds < 3600) {
@@ -2294,6 +2327,7 @@ function formatTime(seconds) {
 
 // 更新评论筛选下拉框
 function updateSpeakerFilter() {
+    console.log("[DEBUG] updateSpeakerFilter 被调用");
     // 获取所有唯一的发言者
     const speakers = new Set();
     
@@ -2378,6 +2412,7 @@ function updateSpeakerFilter() {
 
 // 筛选并显示评论
 function filterAndDisplayComments() {
+    console.log("[DEBUG] filterAndDisplayComments 被调用");
     // 获取筛选条件
     const speakerFilter = document.getElementById('speaker-filter');
     const selectedSpeaker = speakerFilter ? speakerFilter.value : 'all';
@@ -2413,6 +2448,7 @@ function filterAndDisplayComments() {
 
 // 导出为文本格式
 function exportAsText() {
+    console.log("[DEBUG] exportAsText 被调用");
     // 获取当前显示的评论
     const speakerFilter = document.getElementById('speaker-filter');
     const selectedSpeaker = speakerFilter ? speakerFilter.value : 'all';
@@ -2543,6 +2579,7 @@ function exportAsText() {
 
 // 导出为图片格式
 function exportAsImage() {
+    console.log("[DEBUG] exportAsImage 被调用");
     updateCommentCollectorStatus(`导出评论数据为图片...`);
     // 获取评论容器
     const commentsContainer = document.getElementById('comments-container');
@@ -2716,6 +2753,7 @@ function exportAsImage() {
 
 // 动态加载html2canvas库
 function loadHtml2Canvas() {
+    console.log("[DEBUG] loadHtml2Canvas 被调用");
     return new Promise((resolve, reject) => {
         // 检查是否已加载过
         if (window.__html2canvasReady) {
@@ -2725,6 +2763,7 @@ function loadHtml2Canvas() {
 
         // 注入脚本加载函数
         function injectScript(src, onError) {
+            console.log("[DEBUG] injectScript 被调用");
             const script = document.createElement('script');
             script.src = src;
             script.onerror = onError;
@@ -2734,12 +2773,16 @@ function loadHtml2Canvas() {
 
         // 创建截图函数
         const createCaptureFunction = () => {
+            console.log("[DEBUG] createCaptureFunction 被调用");
             return (element, options) => {
+                console.log("[DEBUG] createCaptureFunction 内部被调用");
                 return new Promise((resolveCapture, rejectCapture) => {
+                    console.log("[DEBUG] createCaptureFunction 内部被调用，开始捕获");
                     const captureId = 'capture_' + Date.now();
 
                     // 监听结果
                     const captureListener = (event) => {
+                        console.log("[DEBUG] captureListener 被调用");
                         if (!event.data ||
                             event.data.type !== 'HTML2CANVAS_RESULT' ||
                             event.data.captureId !== captureId) return;
@@ -2754,6 +2797,7 @@ function loadHtml2Canvas() {
                         // 从数据URL创建Canvas
                         const img = new Image();
                         img.onload = () => {
+                            console.log("[DEBUG] 捕获成功，创建canvas");
                             const canvas = document.createElement('canvas');
                             canvas.width = img.width;
                             canvas.height = img.height;
@@ -2794,6 +2838,7 @@ function loadHtml2Canvas() {
 
         // 监听执行器加载完成的消息
         const executorLoadedListener = (event) => {
+            console.log("[DEBUG] executorLoadedListener 被调用");
             if (event.data && event.data.type === 'HTML2CANVAS_EXECUTOR_LOADED') {
                 window.removeEventListener('message', executorLoadedListener);
 
@@ -2840,6 +2885,7 @@ if (document.readyState === 'loading') {
 
 // 导出悬浮窗中的树洞数据为文本格式
 function exportHolesAsText() {
+    console.log("[DEBUG] exportHolesAsText 被调用");
     if (!holesData || holesData.length === 0) {
         updateGlobalStatus('没有可导出的数据，请先收集数据', true);
         return;
@@ -2942,6 +2988,7 @@ function exportHolesAsText() {
 
 // 导出悬浮窗中的树洞数据为图片格式
 function exportHolesAsImage() {
+    console.log("[DEBUG] exportHolesAsImage 被调用");
     updateGlobalStatus(`导出树洞数据为图片...`);
     if (!holesData || holesData.length === 0) {
         updateGlobalStatus('没有可导出的数据，请先收集数据', true);
@@ -3101,6 +3148,7 @@ function exportHolesAsImage() {
 
 // 获取排序方式的中文名称
 function getSortMethodName(method) {
+    console.log("[DEBUG] getSortMethodName 被调用");
     switch (method) {
         case 'like': return '按收藏数排序';
         case 'reply': return '按评论数排序';
@@ -3112,6 +3160,7 @@ function getSortMethodName(method) {
 
 // 添加排序函数
 function sortHolesByMethod(holes, method) {
+    console.log("[DEBUG] sortHolesByMethod 被调用");
     const sortedHoles = [...holes];
     switch (method) {
         case 'like':
@@ -3140,23 +3189,25 @@ function sortHolesByMethod(holes, method) {
 
 // 获取导出设置
 function getExportSettings() {
-  return new Promise((resolve) => {
-    if (typeof chrome !== 'undefined' && chrome.storage) {
-      chrome.storage.sync.get({
-        // 默认值
-        exportMode: 'both'
-      }, function(items) {
-        resolve(items.exportMode);
-      });
-    } else {
-      // 如果无法访问chrome.storage，使用默认值
-      resolve('both');
-    }
-  });
+    console.log("[DEBUG] getExportSettings 被调用");
+    return new Promise((resolve) => {
+        if (typeof chrome !== 'undefined' && chrome.storage) {
+            chrome.storage.sync.get({
+                // 默认值
+                exportMode: 'both'
+            }, function(items) {
+                resolve(items.exportMode);
+            });
+        } else {
+            // 如果无法访问chrome.storage，使用默认值
+            resolve('both');
+        }
+    });
 }
 
 // 获取API设置
 function getApiSettings() {
+    console.log("[DEBUG] getApiSettings 被调用");
     return new Promise((resolve) => {
         if (typeof chrome !== 'undefined' && chrome.storage) {
             chrome.storage.sync.get({
@@ -3188,6 +3239,7 @@ function getApiSettings() {
 
 // 总结树洞内容
 async function summarizeTreehole() {
+    console.log("[DEBUG] summarizeTreehole 被调用");
     try {
         updateCommentCollectorStatus('正在准备总结树洞内容...');
         
@@ -3365,6 +3417,7 @@ async function summarizeTreehole() {
 
 // 调用智谱GLM-4 API进行树洞总结
 async function summarizeWithZhipuAI(content, apiKey, model = 'glm-4-flash') {
+    console.log("[DEBUG] summarizeWithZhipuAI 被调用");
     try {
         const apiUrl = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
         
@@ -3401,6 +3454,7 @@ async function summarizeWithZhipuAI(content, apiKey, model = 'glm-4-flash') {
 
 // 调用DeepSeek API进行树洞总结
 async function summarizeWithDeepSeekAI(content, apiKey, model = 'deepseek-chat') {
+    console.log("[DEBUG] summarizeWithDeepSeekAI 被调用");
     try {
         const apiUrl = 'https://api.deepseek.com/v1/chat/completions';
         
@@ -3446,6 +3500,7 @@ async function summarizeWithDeepSeekAI(content, apiKey, model = 'deepseek-chat')
 }
 
 async function classifyTreehole(content, apiKey) {
+    console.log("[DEBUG] classifyTreehole 被调用");
     const categories = [
         "popi", "交友", "求助", "提问", "情感", "学习", "生活", "其他"
     ];
@@ -3495,6 +3550,7 @@ async function classifyTreehole(content, apiKey) {
 
 // 自动生成对树洞的回复
 async function generateTreeholeReply() {
+    console.log("[DEBUG] generateTreeholeReply 被调用");
     try {
         updateCommentCollectorStatus("正在生成回复...");
         document.getElementById('generate-reply').disabled = true;
@@ -3586,6 +3642,7 @@ async function generateTreeholeReply() {
 
 // 使用DeepSeek AI生成回复
 async function generateReplyWithDeepSeekAI(content, apiKey, style, model = 'deepseek-chat', promptPrefix = '') {
+    console.log("[DEBUG] generateReplyWithDeepSeekAI 被调用");
     try {
         const apiUrl = 'https://api.deepseek.com/v1/chat/completions';
         
@@ -3648,6 +3705,7 @@ async function generateReplyWithDeepSeekAI(content, apiKey, style, model = 'deep
 
 // 使用智谱AI生成回复
 async function generateReplyWithZhipuAI(content, apiKey, style, model = 'glm-4-flash', promptPrefix = '') {
+    console.log("[DEBUG] generateReplyWithZhipuAI 被调用");
     try {
         // 根据不同风格设置不同的prompt
         let styleInstruction;
