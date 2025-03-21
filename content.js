@@ -1,3 +1,5 @@
+//content.js
+//post collection and comments collection
 // 存储帖子数据
 let holesData = [];
 let isCollecting = false;
@@ -14,42 +16,6 @@ let speakerList = new Set(); // 存储所有发言人列表
 let statusTextElement = null; // 状态文本元素引用
 let tabElement = null; // tab元素引用
 
-// 全局状态更新函数
-function updateGlobalStatus(text, isError = false) {
-    console.log("[DEBUG] updateGlobalStatus 被调用");
-    if (statusTextElement) {
-        statusTextElement.style.display = 'block';
-        statusTextElement.style.background = isError ? '#ffebee' : '#e8f5e9';
-        statusTextElement.textContent = text;
-    } else {
-        console.log(`状态更新: ${text}${isError ? ' (错误)' : ''}`);
-    }
-}
-
-// 检查并应用主题颜色到tab
-function applyThemeToTab() {
-    console.log("[DEBUG] applyThemeToTab 被调用");
-    // 检查是否存在root-dark-mode类
-    const appElement = document.getElementById('app');
-    const hasRootDarkMode = appElement && appElement.classList.contains('root-dark-mode');
-
-    // 如果找到root-dark-mode类，直接应用深色主题
-    if (hasRootDarkMode) {
-        if (tabElement) {
-            tabElement.style.backgroundColor = '#333333'; // 深灰色背景
-            tabElement.style.color = 'white'; // 白色文本
-            tabElement.dataset.theme = 'dark'; // 设置数据属性表示当前是深色主题
-        }
-        return; // 已经应用了主题，直接返回
-    } else {
-        if (tabElement) {
-            tabElement.style.backgroundColor = '#f0f0f0'; // 浅灰色背景
-            tabElement.style.color = '#333'; // 深色文本，提高对比度
-            tabElement.dataset.theme = 'light'; // 设置数据属性表示当前是浅色主题
-        }
-    }
-}
-
 // 评论自动滚动相关变量
 let commentsScrollInterval = null;
 let isCommentsScrolling = false;
@@ -63,358 +29,13 @@ let earliestCommentTime = null;
 let latestCommentTime = null; // 新增：用于记录最晚评论时间
 let totalExpectedComments = 0; // 预期的总评论数量
 
-// 在文件适当位置添加全局变量
+// 分类相关变量
 let isClassifying = false; // 标记是否正在进行分类
 let classifyInterval = null; // 分类的间隔定时器
 let classifiedCount = 0; // 已分类的数量
 let totalClassifiedCount = 0; // 总共分类的数量（包括此次和之前的）
 
-// 自动滚动函数
-function autoScroll() {
-    console.log("[DEBUG] autoScroll 被调用");
-    if (isScrolling) return;
-
-    isScrolling = true;
-
-    // 使用用户提供的滚动容器
-    const scrollContainer = document.querySelector(".left-container");
-    if (!scrollContainer) {
-        console.error("[PKU TreeHole] 无法找到滚动容器");
-        isScrolling = false;
-        return;
-    }
-
-    console.log("[PKU TreeHole] 开始自动滚动...");
-
-    let scrollCount = 0;
-    const maxScrolls = 200; // 防止无限滚动
-
-    // 清除可能存在的上一个滚动计时器
-    if (scrollInterval) {
-        clearInterval(scrollInterval);
-    }
-
-    scrollInterval = setInterval(() => {
-        // 滚动页面
-        scrollContainer.scrollBy(0, 5000);
-        scrollCount++;
-
-        // 检查是否需要停止滚动
-        const timeExpired = timeLimit && (Date.now() - startTime > timeLimit);
-        const reachedLimit = postsLimit && holesData.length >= postsLimit;
-
-        if (timeExpired || reachedLimit || scrollCount > maxScrolls) {
-            clearInterval(scrollInterval);
-            scrollInterval = null;
-            isScrolling = false;
-
-            if (timeExpired || reachedLimit) {
-                let reason = '';
-                if (timeExpired) {
-                    reason = '达到时间限制';
-                } else if (reachedLimit) {
-                    reason = '达到数量限制';
-                }
-                stopCollection(true, reason);
-                scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
-                console.log("[PKU TreeHole] 达到限制条件，停止滚动");
-            } else {
-                console.log("[PKU TreeHole] 滚动次数达到上限，短暂暂停后继续");
-                // 短暂暂停后继续滚动
-                setTimeout(autoScroll, 2000);
-            }
-        }
-    }, 500); // 每500毫秒滚动一次
-}
-
-// 处理帖子数据
-function processHoles() {
-    console.log("[DEBUG] processHoles 被调用");
-    const holes = document.querySelectorAll('.flow-item-row');
-    let newHolesCount = 0;
-    let reachedTimeLimit = false;
-
-    holes.forEach(hole => {
-        if (hole.dataset.processed) return;
-
-        const likeNum = hole.querySelector('.box-header-badge.likenum');
-        const replyElement = hole.querySelector('.box-header-badge .icon-reply');
-        const idElement = hole.querySelector('.box-id');
-        const contentElement = hole.querySelector('.box-content');
-        const headerElement = hole.querySelector('.box-header');
-        const hasImage = hole.querySelector('.box-content img') !== null;
-
-        if (likeNum && idElement && contentElement && headerElement) {
-            const count = parseInt(likeNum.textContent.trim());
-            const replies = replyElement ? parseInt(replyElement.parentElement.textContent.trim()) : 0;
-            const id = idElement.textContent.trim().replace('#', '').trim();
-            const content = contentElement.textContent.trim();
-
-            // 获取发布时间
-            const headerText = headerElement.textContent;
-            const timeMatch = headerText.match(/\d{2}-\d{2} \d{2}:\d{2}/);
-            const publishTime = timeMatch ? timeMatch[0] : '';
-
-            // 检查是否达到时间限制
-            if (publishTime && endTime) {
-                const currentYear = new Date().getFullYear();
-                const postTime = new Date(currentYear + '-' + publishTime.replace(' ', 'T'));
-                
-                console.log("[PKU TreeHole] 检查帖子时间:", postTime, "是否早于或等于截止时间:", endTime);
-                
-                // 注意：这里的逻辑是，如果帖子时间早于或等于截止时间，则停止收集
-                if (postTime <= endTime) {
-                    console.log("[PKU TreeHole] 达到时间限制，发现早于截止时间的帖子:", id, "发布时间:", publishTime);
-                    reachedTimeLimit = true;
-                    stopCollection(true, '达到发布时间限制');
-                    return;
-                }
-            }
-
-            // 存储数据
-            const holeData = {
-                id: id,
-                content,
-                likeCount: count,
-                replyCount: replies,
-                publishTime: publishTime,
-                hasImage: hasImage
-            };
-
-            // 检查是否已存在该帖子
-            const existingIndex = holesData.findIndex(h => h.id === id);
-            if (existingIndex === -1) {
-                holesData.push(holeData);
-                newHolesCount++;
-            } else {
-                holesData[existingIndex] = holeData;
-            }
-        }
-
-        hole.dataset.processed = 'true';
-    });
-
-    if (newHolesCount > 0) {
-        console.log(`[PKU TreeHole] 新增 ${newHolesCount} 条帖子，总计 ${holesData.length} 条`);
-    }
-
-    // 检查是否需要停止收集
-    if (isCollecting) {
-        const currentTime = Date.now();
-        const timeExpired = timeLimit && (currentTime - startTime > timeLimit);
-        const reachedLimit = postsLimit && holesData.length >= postsLimit;
-
-        if (timeExpired || reachedLimit || reachedTimeLimit) {
-            let reason = '';
-            if (timeExpired) {
-                reason = '达到搜寻时间限制';
-            } else if (reachedLimit) {
-                reason = '达到帖子数量限制';
-            } else if (reachedTimeLimit) {
-                reason = '达到发布时间限制';
-            }
-            stopCollection(true, reason);
-        }
-    }
-}
-
-// 创建 MutationObserver 来监听 DOM 变化
-const mutationObserver = new MutationObserver((mutations) => {
-    let hasNewNodes = false;
-
-    mutations.forEach((mutation) => {
-        if (mutation.addedNodes.length) {
-            hasNewNodes = true;
-        }
-    });
-
-    if (hasNewNodes) {
-        processHoles();
-    }
-});
-
-// 初始化页面监视器
-function initPageObserver() {
-    console.log("[DEBUG] initPageObserver 被调用");
-    // 监听整个页面的变化
-    mutationObserver.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
-
-    console.log("[PKU TreeHole] 已初始化页面监视器");
-}
-
-// 加载初始数据
-function loadInitialData() {
-    console.log("[DEBUG] loadInitialData 被调用");
-    processHoles();
-    console.log("[PKU TreeHole] 已处理初始可见帖子");
-}
-
-// 开始收集数据
-function startCollection(options) {
-    console.log("[DEBUG] startCollection 被调用");
-    console.log("[PKU TreeHole] 开始收集数据，时间限制:", options.timeLimit / 1000, "秒，数量限制:", options.postsLimit);
-
-    // 如果正在收集中，先停止当前收集
-    if (isCollecting) {
-        console.log("[PKU TreeHole] 已有收集任务正在进行，重新开始...");
-        stopCollection(false);
-    }
-
-    // 设置新的收集参数（不清空已有数据）
-    isCollecting = true;
-    timeLimit = options.timeLimit;
-    postsLimit = options.postsLimit;
-    startTime = Date.now();
-    endTime = options.endTime || null;  // 确保设置endTime全局变量
-
-    console.log("[PKU TreeHole] 设置参数: 时间限制", timeLimit, "毫秒, 数量限制", postsLimit, "帖子, 截止时间", endTime);
-
-    // 初始化页面监视
-    initPageObserver();
-
-    // 处理当前可见帖子
-    loadInitialData();
-
-    // 启动定期检查
-    if (!checkInterval) {
-        checkInterval = setInterval(processHoles, 2000); // 每2秒检查一次新数据
-    }
-
-    // 根据选项决定是否开始自动滚动
-    if (options.autoScroll) {
-        console.log("[PKU TreeHole] 启用自动滚动");
-        autoScroll();
-    } else {
-        console.log("[PKU TreeHole] 禁用自动滚动");
-    }
-
-    // 返回当前已有的数据数量
-    return holesData.length;
-}
-
-// 停止收集数据
-function stopCollection(updateUI = false, reason = '') {
-    console.log("[DEBUG] stopCollection 被调用");
-    console.log("[PKU TreeHole] 停止收集，共收集到", holesData.length, "条帖子", reason ? `，原因: ${reason}` : '');
-
-    isCollecting = false;
-    if (checkInterval) {
-        clearInterval(checkInterval);
-        checkInterval = null;
-    }
-
-    if (scrollInterval) {
-        clearInterval(scrollInterval);
-        scrollInterval = null;
-    }
-    isScrolling = false;
-    
-    // 添加更新UI的逻辑
-    if (updateUI) {
-        console.log("[PKU TreeHole] 正在更新UI...");
-        
-        // 获取面板元素
-        const panel = document.getElementById('pku-treehole-panel');
-        if (panel) {
-            console.log("[PKU TreeHole] 找到面板元素");
-            
-            // 获取按钮和加载指示器
-            const startBtn = panel.querySelector('#start-btn');
-            const stopBtn = panel.querySelector('#stop-btn');
-            const loadingDiv = panel.querySelector('.loading');
-            
-            // 更新按钮状态
-            if (startBtn) {
-                startBtn.style.display = 'inline-block';
-                console.log("[PKU TreeHole] 显示开始按钮");
-            }
-            if (stopBtn) {
-                stopBtn.style.display = 'none';
-                console.log("[PKU TreeHole] 隐藏停止按钮");
-            }
-            if (loadingDiv) {
-                loadingDiv.style.display = 'none';
-                console.log("[PKU TreeHole] 隐藏加载指示器");
-            }
-            
-            // 获取最后一条帖子的发布时间
-            const lastTime = holesData.length > 0 ? holesData[holesData.length - 1].publishTime : '';
-            
-            // 构建状态消息
-            let statusMessage = `收集完成，共 ${holesData.length} 条数据`;
-            if (lastTime) {
-                statusMessage += `，最后帖子发布于 ${lastTime}`;
-            }
-            if (reason) {
-                statusMessage += `（${reason}）`;
-            }
-            
-            try {
-                // 尝试调用面板特定的updateStatus函数
-                if (typeof updateStatus === 'function') {
-                    console.log("[PKU TreeHole] 调用updateStatus函数");
-                    updateStatus(statusMessage);
-                    displayHoles(holesData);
-                } else {
-                    // 如果updateStatus不可用，使用全局状态更新
-                    console.log("[PKU TreeHole] updateStatus函数不可用，使用全局状态更新");
-                    updateGlobalStatus(statusMessage);
-                }
-            } catch (error) {
-                console.error("[PKU TreeHole] 更新状态时出错:", error);
-                // 尝试直接更新DOM
-                const statusText = panel.querySelector('#status-text');
-                if (statusText) {
-                    statusText.textContent = statusMessage;
-                    statusText.style.background = '#e8f5e9';
-                    statusText.style.display = 'block';
-                }
-            }
-        } else {
-            console.log("[PKU TreeHole] 未找到面板元素");
-            // 使用全局状态更新
-            updateGlobalStatus(`收集完成，共 ${holesData.length} 条数据${reason ? ` (${reason})` : ''}`);
-        }
-    }
-}
-
-// 监听来自popup的消息
-chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
-    console.log("[PKU TreeHole] 收到消息:", request.action);
-
-    switch (request.action) {
-        case "startCollection":
-            try {
-                const currentCount = startCollection({
-                    timeLimit: request.timeLimit,
-                    postsLimit: request.postsLimit
-                });
-                sendResponse({ success: true, currentCount: currentCount });
-            } catch (error) {
-                console.error("[PKU TreeHole] 启动收集出错:", error);
-                sendResponse({ success: false, error: error.message });
-            }
-            break;
-
-        case "stopCollection":
-            stopCollection(true, '从弹出窗口停止');
-            sendResponse({ success: true });
-            break;
-
-        case "getHolesData":
-            console.log("[PKU TreeHole] 发送数据，数量:", holesData.length);
-            sendResponse({
-                holes: holesData,
-                isFinished: !isCollecting,
-                count: holesData.length
-            });
-            break;
-    }
-    return true;
-});
+/*************************************post collection*************************************/
 
 // 在文件开头添加面板创建代码
 function createFloatingPanel() {
@@ -979,7 +600,420 @@ function createFloatingPanel() {
     }
 }
 
-// 在原有代码后面添加新的函数
+// 全局状态更新函数
+function updateGlobalStatus(text, isError = false) {
+    console.log("[DEBUG] updateGlobalStatus 被调用");
+    if (statusTextElement) {
+        statusTextElement.style.display = 'block';
+        statusTextElement.style.background = isError ? '#ffebee' : '#e8f5e9';
+        statusTextElement.textContent = text;
+    } else {
+        console.log(`状态更新: ${text}${isError ? ' (错误)' : ''}`);
+    }
+}
+
+// 检查并应用主题颜色到tab
+function applyThemeToTab() {
+    console.log("[DEBUG] applyThemeToTab 被调用");
+    // 检查是否存在root-dark-mode类
+    const appElement = document.getElementById('app');
+    const hasRootDarkMode = appElement && appElement.classList.contains('root-dark-mode');
+
+    // 如果找到root-dark-mode类，直接应用深色主题
+    if (hasRootDarkMode) {
+        if (tabElement) {
+            tabElement.style.backgroundColor = '#333333'; // 深灰色背景
+            tabElement.style.color = 'white'; // 白色文本
+            tabElement.dataset.theme = 'dark'; // 设置数据属性表示当前是深色主题
+        }
+        return; // 已经应用了主题，直接返回
+    } else {
+        if (tabElement) {
+            tabElement.style.backgroundColor = '#f0f0f0'; // 浅灰色背景
+            tabElement.style.color = '#333'; // 深色文本，提高对比度
+            tabElement.dataset.theme = 'light'; // 设置数据属性表示当前是浅色主题
+        }
+    }
+}
+
+// 自动滚动函数
+function autoScroll() {
+    console.log("[DEBUG] autoScroll 被调用");
+    if (isScrolling) return;
+
+    isScrolling = true;
+
+    // 使用用户提供的滚动容器
+    const scrollContainer = document.querySelector(".left-container");
+    if (!scrollContainer) {
+        console.error("[PKU TreeHole] 无法找到滚动容器");
+        isScrolling = false;
+        return;
+    }
+
+    console.log("[PKU TreeHole] 开始自动滚动...");
+
+    let scrollCount = 0;
+    const maxScrolls = 200; // 防止无限滚动
+
+    // 清除可能存在的上一个滚动计时器
+    if (scrollInterval) {
+        clearInterval(scrollInterval);
+    }
+
+    scrollInterval = setInterval(() => {
+        // 滚动页面
+        scrollContainer.scrollBy(0, 5000);
+        scrollCount++;
+
+        // 检查是否需要停止滚动
+        const timeExpired = timeLimit && (Date.now() - startTime > timeLimit);
+        const reachedLimit = postsLimit && holesData.length >= postsLimit;
+
+        if (timeExpired || reachedLimit || scrollCount > maxScrolls) {
+            clearInterval(scrollInterval);
+            scrollInterval = null;
+            isScrolling = false;
+
+            if (timeExpired || reachedLimit) {
+                let reason = '';
+                if (timeExpired) {
+                    reason = '达到时间限制';
+                } else if (reachedLimit) {
+                    reason = '达到数量限制';
+                }
+                stopCollection(true, reason);
+                scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+                console.log("[PKU TreeHole] 达到限制条件，停止滚动");
+            } else {
+                console.log("[PKU TreeHole] 滚动次数达到上限，短暂暂停后继续");
+                // 短暂暂停后继续滚动
+                setTimeout(autoScroll, 2000);
+            }
+        }
+    }, 500); // 每500毫秒滚动一次
+}
+
+// 处理帖子数据
+function processHoles() {
+    console.log("[DEBUG] processHoles 被调用");
+    const holes = document.querySelectorAll('.flow-item-row');
+    let newHolesCount = 0;
+    let reachedTimeLimit = false;
+
+    holes.forEach(hole => {
+        if (hole.dataset.processed) return;
+
+        const likeNum = hole.querySelector('.box-header-badge.likenum');
+        const replyElement = hole.querySelector('.box-header-badge .icon-reply');
+        const idElement = hole.querySelector('.box-id');
+        const contentElement = hole.querySelector('.box-content');
+        const headerElement = hole.querySelector('.box-header');
+        const hasImage = hole.querySelector('.box-content img') !== null;
+
+        if (likeNum && idElement && contentElement && headerElement) {
+            const count = parseInt(likeNum.textContent.trim());
+            const replies = replyElement ? parseInt(replyElement.parentElement.textContent.trim()) : 0;
+            const id = idElement.textContent.trim().replace('#', '').trim();
+            const content = contentElement.textContent.trim();
+
+            // 获取发布时间
+            const headerText = headerElement.textContent;
+            const timeMatch = headerText.match(/\d{2}-\d{2} \d{2}:\d{2}/);
+            const publishTime = timeMatch ? timeMatch[0] : '';
+
+            // 检查是否达到时间限制
+            if (publishTime && endTime) {
+                const currentYear = new Date().getFullYear();
+                const postTime = new Date(currentYear + '-' + publishTime.replace(' ', 'T'));
+                
+                console.log("[PKU TreeHole] 检查帖子时间:", postTime, "是否早于或等于截止时间:", endTime);
+                
+                // 注意：这里的逻辑是，如果帖子时间早于或等于截止时间，则停止收集
+                if (postTime <= endTime) {
+                    console.log("[PKU TreeHole] 达到时间限制，发现早于截止时间的帖子:", id, "发布时间:", publishTime);
+                    reachedTimeLimit = true;
+                    stopCollection(true, '达到发布时间限制');
+                    return;
+                }
+            }
+
+            // 存储数据
+            const holeData = {
+                id: id,
+                content,
+                likeCount: count,
+                replyCount: replies,
+                publishTime: publishTime,
+                hasImage: hasImage
+            };
+
+            // 检查是否已存在该帖子
+            const existingIndex = holesData.findIndex(h => h.id === id);
+            if (existingIndex === -1) {
+                holesData.push(holeData);
+                newHolesCount++;
+            } else {
+                holesData[existingIndex] = holeData;
+            }
+        }
+
+        hole.dataset.processed = 'true';
+    });
+
+    if (newHolesCount > 0) {
+        console.log(`[PKU TreeHole] 新增 ${newHolesCount} 条帖子，总计 ${holesData.length} 条`);
+    }
+
+    // 检查是否需要停止收集
+    if (isCollecting) {
+        const currentTime = Date.now();
+        const timeExpired = timeLimit && (currentTime - startTime > timeLimit);
+        const reachedLimit = postsLimit && holesData.length >= postsLimit;
+
+        if (timeExpired || reachedLimit || reachedTimeLimit) {
+            let reason = '';
+            if (timeExpired) {
+                reason = '达到搜寻时间限制';
+            } else if (reachedLimit) {
+                reason = '达到帖子数量限制';
+            } else if (reachedTimeLimit) {
+                reason = '达到发布时间限制';
+            }
+            stopCollection(true, reason);
+        }
+    }
+}
+
+// 创建 MutationObserver 来监听 DOM 变化
+const mutationObserver = new MutationObserver((mutations) => {
+    let hasNewNodes = false;
+
+    mutations.forEach((mutation) => {
+        if (mutation.addedNodes.length) {
+            hasNewNodes = true;
+        }
+    });
+
+    if (hasNewNodes) {
+        processHoles();
+    }
+});
+
+// 初始化页面监视器
+function initPageObserver() {
+    console.log("[DEBUG] initPageObserver 被调用");
+    // 监听整个页面的变化
+    mutationObserver.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+    console.log("[PKU TreeHole] 已初始化页面监视器");
+}
+
+// 加载初始数据
+function loadInitialData() {
+    console.log("[DEBUG] loadInitialData 被调用");
+    processHoles();
+    console.log("[PKU TreeHole] 已处理初始可见帖子");
+}
+
+// 开始收集数据
+function startCollection(options) {
+    console.log("[DEBUG] startCollection 被调用");
+    console.log("[PKU TreeHole] 开始收集数据，时间限制:", options.timeLimit / 1000, "秒，数量限制:", options.postsLimit);
+
+    // 如果正在收集中，先停止当前收集
+    if (isCollecting) {
+        console.log("[PKU TreeHole] 已有收集任务正在进行，重新开始...");
+        stopCollection(false);
+    }
+
+    // 设置新的收集参数（不清空已有数据）
+    isCollecting = true;
+    timeLimit = options.timeLimit;
+    postsLimit = options.postsLimit;
+    startTime = Date.now();
+    endTime = options.endTime || null;  // 确保设置endTime全局变量
+
+    console.log("[PKU TreeHole] 设置参数: 时间限制", timeLimit, "毫秒, 数量限制", postsLimit, "帖子, 截止时间", endTime);
+
+    // 初始化页面监视
+    initPageObserver();
+
+    // 处理当前可见帖子
+    loadInitialData();
+
+    // 启动定期检查
+    if (!checkInterval) {
+        checkInterval = setInterval(processHoles, 2000); // 每2秒检查一次新数据
+    }
+
+    // 根据选项决定是否开始自动滚动
+    if (options.autoScroll) {
+        console.log("[PKU TreeHole] 启用自动滚动");
+        autoScroll();
+    } else {
+        console.log("[PKU TreeHole] 禁用自动滚动");
+    }
+
+    // 返回当前已有的数据数量
+    return holesData.length;
+}
+
+// 停止收集数据
+function stopCollection(updateUI = false, reason = '') {
+    console.log("[DEBUG] stopCollection 被调用");
+    console.log("[PKU TreeHole] 停止收集，共收集到", holesData.length, "条帖子", reason ? `，原因: ${reason}` : '');
+
+    isCollecting = false;
+    if (checkInterval) {
+        clearInterval(checkInterval);
+        checkInterval = null;
+    }
+
+    if (scrollInterval) {
+        clearInterval(scrollInterval);
+        scrollInterval = null;
+    }
+    isScrolling = false;
+    
+    // 添加更新UI的逻辑
+    if (updateUI) {
+        console.log("[PKU TreeHole] 正在更新UI...");
+        
+        // 获取面板元素
+        const panel = document.getElementById('pku-treehole-panel');
+        if (panel) {
+            console.log("[PKU TreeHole] 找到面板元素");
+            
+            // 获取按钮和加载指示器
+            const startBtn = panel.querySelector('#start-btn');
+            const stopBtn = panel.querySelector('#stop-btn');
+            const loadingDiv = panel.querySelector('.loading');
+            
+            // 更新按钮状态
+            if (startBtn) {
+                startBtn.style.display = 'inline-block';
+                console.log("[PKU TreeHole] 显示开始按钮");
+            }
+            if (stopBtn) {
+                stopBtn.style.display = 'none';
+                console.log("[PKU TreeHole] 隐藏停止按钮");
+            }
+            if (loadingDiv) {
+                loadingDiv.style.display = 'none';
+                console.log("[PKU TreeHole] 隐藏加载指示器");
+            }
+            
+            // 获取最后一条帖子的发布时间
+            const lastTime = holesData.length > 0 ? holesData[holesData.length - 1].publishTime : '';
+            
+            // 构建状态消息
+            let statusMessage = `收集完成，共 ${holesData.length} 条数据`;
+            if (lastTime) {
+                statusMessage += `，最后帖子发布于 ${lastTime}`;
+            }
+            if (reason) {
+                statusMessage += `（${reason}）`;
+            }
+            
+            try {
+                // 尝试调用面板特定的updateStatus函数
+                if (typeof updateStatus === 'function') {
+                    console.log("[PKU TreeHole] 调用updateStatus函数");
+                    updateStatus(statusMessage);
+                    displayHoles(holesData);
+                } else {
+                    // 如果updateStatus不可用，使用全局状态更新
+                    console.log("[PKU TreeHole] updateStatus函数不可用，使用全局状态更新");
+                    updateGlobalStatus(statusMessage);
+                }
+            } catch (error) {
+                console.error("[PKU TreeHole] 更新状态时出错:", error);
+                // 尝试直接更新DOM
+                const statusText = panel.querySelector('#status-text');
+                if (statusText) {
+                    statusText.textContent = statusMessage;
+                    statusText.style.background = '#e8f5e9';
+                    statusText.style.display = 'block';
+                }
+            }
+        } else {
+            console.log("[PKU TreeHole] 未找到面板元素");
+            // 使用全局状态更新
+            updateGlobalStatus(`收集完成，共 ${holesData.length} 条数据${reason ? ` (${reason})` : ''}`);
+        }
+    }
+}
+
+// 监听来自popup的消息
+chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
+    console.log("[PKU TreeHole] 收到消息:", request.action);
+
+    switch (request.action) {
+        case "startCollection":
+            try {
+                const currentCount = startCollection({
+                    timeLimit: request.timeLimit,
+                    postsLimit: request.postsLimit
+                });
+                sendResponse({ success: true, currentCount: currentCount });
+            } catch (error) {
+                console.error("[PKU TreeHole] 启动收集出错:", error);
+                sendResponse({ success: false, error: error.message });
+            }
+            break;
+
+        case "stopCollection":
+            stopCollection(true, '从弹出窗口停止');
+            sendResponse({ success: true });
+            break;
+
+        case "getHolesData":
+            console.log("[PKU TreeHole] 发送数据，数量:", holesData.length);
+            sendResponse({
+                holes: holesData,
+                isFinished: !isCollecting,
+                count: holesData.length
+            });
+            break;
+    }
+    return true;
+});
+
+// 添加排序函数
+function sortHolesByMethod(holes, method) {
+    console.log("[DEBUG] sortHolesByMethod 被调用");
+    const sortedHoles = [...holes];
+    switch (method) {
+        case 'like':
+            sortedHoles.sort((a, b) => b.likeCount - a.likeCount);
+            break;
+        case 'reply':
+            sortedHoles.sort((a, b) => b.replyCount - a.replyCount);
+            break;
+        case 'time':
+            sortedHoles.sort((a, b) => {
+                const timeA = a.publishTime.split(' ').reverse().join(' ');
+                const timeB = b.publishTime.split(' ').reverse().join(' ');
+                return timeB.localeCompare(timeA);
+            });
+            break;
+        case 'comprehensive':
+            sortedHoles.sort((a, b) => {
+                const scoreA = a.likeCount * a.replyCount;
+                const scoreB = b.likeCount * b.replyCount;
+                return scoreB - scoreA;
+            });
+            break;
+    }
+    return sortedHoles;
+}
+
+/*************************************comments collection*************************************/
+// 在原有树洞详情页后面添加新的函数
 function createCommentCollectorButton() {
     console.log("[DEBUG] createCommentCollectorButton 被调用");
     // 检查当前是否在树洞详情页
@@ -2446,6 +2480,8 @@ function filterAndDisplayComments() {
     }
 }
 
+/*************************************export*************************************/
+
 // 导出为文本格式
 function exportAsText() {
     console.log("[DEBUG] exportAsText 被调用");
@@ -3158,35 +3194,6 @@ function getSortMethodName(method) {
     }
 }
 
-// 添加排序函数
-function sortHolesByMethod(holes, method) {
-    console.log("[DEBUG] sortHolesByMethod 被调用");
-    const sortedHoles = [...holes];
-    switch (method) {
-        case 'like':
-            sortedHoles.sort((a, b) => b.likeCount - a.likeCount);
-            break;
-        case 'reply':
-            sortedHoles.sort((a, b) => b.replyCount - a.replyCount);
-            break;
-        case 'time':
-            sortedHoles.sort((a, b) => {
-                const timeA = a.publishTime.split(' ').reverse().join(' ');
-                const timeB = b.publishTime.split(' ').reverse().join(' ');
-                return timeB.localeCompare(timeA);
-            });
-            break;
-        case 'comprehensive':
-            sortedHoles.sort((a, b) => {
-                const scoreA = a.likeCount * a.replyCount;
-                const scoreB = b.likeCount * b.replyCount;
-                return scoreB - scoreA;
-            });
-            break;
-    }
-    return sortedHoles;
-}
-
 // 获取导出设置
 function getExportSettings() {
     console.log("[DEBUG] getExportSettings 被调用");
@@ -3205,6 +3212,7 @@ function getExportSettings() {
     });
 }
 
+/*************************************llm API*************************************/
 // 获取API设置
 function getApiSettings() {
     console.log("[DEBUG] getApiSettings 被调用");
