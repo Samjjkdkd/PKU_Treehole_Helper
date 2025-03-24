@@ -180,7 +180,7 @@
 
 .sort-option select:focus {
     outline: none;
-    border-color: #1a73e8;
+    /*border-color: #1a73e8;*/
     box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
 }
 
