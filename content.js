@@ -10,6 +10,8 @@ let checkInterval = null;
 let scrollInterval = null;
 let isScrolling = false;
 let endTime = null;
+let timeReachLimited = false; // 标记是否因为达到发布时间限制而停止收集
+let postsReachLimited = false; // 标记是否因为达到帖子数量限制而停止收集
 let commentsData = []; // 存储评论数据
 let allCommentsData = []; // 存储所有评论数据
 let speakerList = new Set(); // 存储所有发言人列表
@@ -224,12 +226,6 @@ function createFloatingPanel() {
         }
     });
 
-    function updateStatus(text, isError = false) {
-        console.log("[DEBUG] updateStatus 被调用");
-        statusTextElement = statusText; // 保存对状态文本元素的引用
-        updateGlobalStatus(text, isError);
-    }
-
     function displayHoles(holes) {
         console.log("[DEBUG] displayHoles 被调用");
         if (!holes || holes.length === 0) {
@@ -304,6 +300,9 @@ function createFloatingPanel() {
             holesContainer.appendChild(holeDiv);
         });
     }
+    
+    // 注册 displayHoles 函数供全局使用
+    registerDisplayHolesFunction(displayHoles);
 
     // 设置时间输入框的默认值和清除按钮
     const endTimeInput = panel.querySelector('#end-time');
@@ -317,9 +316,34 @@ function createFloatingPanel() {
     const hours = String(defaultTime.getHours()).padStart(2, '0');
     const minutes = String(defaultTime.getMinutes()).padStart(2, '0');
     endTimeInput.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+    
+    // 监听时间输入框变化
+    endTimeInput.addEventListener('change', () => {
+        if (timeReachLimited) {
+            timeReachLimited = false;
+            console.log("[PKU TreeHole] 时间限制已修改，重置标记");
+            updateGlobalStatus('时间限制已修改，可以重新开始收集数据');
+        }
+    });
+    
+    // 监听帖子数量限制输入框变化
+    postsLimitInput.addEventListener('change', () => {
+        if (postsReachLimited) {
+            postsReachLimited = false;
+            console.log("[PKU TreeHole] 帖子数量限制已修改，重置标记");
+            updateGlobalStatus('帖子数量限制已修改，可以重新开始收集数据');
+        }
+    });
 
     clearTimeBtn.addEventListener('click', () => {
         endTimeInput.value = '';
+        
+        // 重置发布时间限制标记
+        if (timeReachLimited) {
+            timeReachLimited = false;
+            console.log("[PKU TreeHole] 时间限制已清除，重置标记");
+            updateGlobalStatus('时间限制已清除，可以重新开始收集数据');
+        }
 
         // 添加视觉反馈
         clearTimeBtn.style.backgroundColor = '#4CAF50';
@@ -333,6 +357,19 @@ function createFloatingPanel() {
     });
 
     startBtn.addEventListener('click', function () {
+        // 检查是否已经达到了发布时间限制
+        if (timeReachLimited) {
+            updateGlobalStatus('已达到发布时间限制，请修改或清除时间限制后再试', true);
+            // 由于我们不会隐藏开始按钮，这里不需要恢复按钮状态
+            return;
+        }
+        
+        // 检查是否已经达到了帖子数量限制
+        if (postsReachLimited) {
+            updateGlobalStatus('已达到帖子数量限制，请增加数量限制后再试', true);
+            return;
+        }
+        
         startBtn.style.display = 'none';
         stopBtn.style.display = 'inline-block';
         loadingDiv.style.display = 'block';
@@ -356,7 +393,7 @@ function createFloatingPanel() {
                         const postTime = new Date(currentYear + '-' + timeMatch[1].replace(' ', ' '));
 
                         if (endTime > postTime) {
-                            updateStatus('错误：设定的截止时间晚于当前可见帖子的发布时间', true);
+                            updateGlobalStatus('错误：设定的截止时间晚于当前可见帖子的发布时间', true);
                             startBtn.style.display = 'inline-block';
                             stopBtn.style.display = 'none';
                             loadingDiv.style.display = 'none';
@@ -374,9 +411,9 @@ function createFloatingPanel() {
                 autoScroll: autoScrollEnabled,
                 endTime: endTimeStr ? new Date(endTimeStr) : null
             });
-            updateStatus(`开始收集数据，当前已有 ${currentCount || 0} 条数据${autoScrollEnabled ? '' : '（手动滚动模式）'}`);
+            updateGlobalStatus(`开始收集数据，当前已有 ${currentCount || 0} 条数据${autoScrollEnabled ? '' : '（手动滚动模式）'}`);
         } catch (error) {
-            updateStatus('收集数据失败: ' + error.message, true);
+            updateGlobalStatus('收集数据失败: ' + error.message, true);
             stopCollection(true, '出现错误');
         }
     });
@@ -405,7 +442,7 @@ function createFloatingPanel() {
             const elapsedTime = (Date.now() - startTime) / 1000;
             // 获取最后一条帖子的发布时间
             const lastTime = holesData.length > 0 ? holesData[holesData.length - 1].publishTime : '';
-            updateStatus(`已收集 ${holesData.length} 条数据，用时 ${elapsedTime.toFixed(0)} 秒${lastTime ? '，最后帖子发布于 ' + lastTime : ''}`);
+            updateGlobalStatus(`已收集 ${holesData.length} 条数据，用时 ${elapsedTime.toFixed(0)} 秒${lastTime ? '，最后帖子发布于 ' + lastTime : ''}`);
         }
     }, 1000);
 
@@ -505,7 +542,7 @@ function createFloatingPanel() {
                 // 检查是否已经分类
                 if (hole.category) {
                     // 已经分类，立即跳过并处理下一条
-                    updateStatus(`正在批量分类...已处理 ${currentIndex}/${sortedHoles.length} 条，跳过已分类树洞 #${hole.id}`);
+                    updateGlobalStatus(`正在批量分类...已处理 ${currentIndex}/${sortedHoles.length} 条，跳过已分类树洞 #${hole.id}`);
                     processNextHole(); // 立即处理下一条
                     return;
                 }
@@ -553,13 +590,13 @@ function createFloatingPanel() {
                     totalClassifiedCount++;
                     
                     // 更新状态
-                    updateStatus(`正在批量分类...已分类 ${classifiedCount} 条（总计 ${totalClassifiedCount} 条），当前处理 #${hole.id}`);
+                    updateGlobalStatus(`正在批量分类...已分类 ${classifiedCount} 条（总计 ${totalClassifiedCount} 条），当前处理 #${hole.id}`);
                     
                     // 延迟1秒后处理下一条，避免API请求过于频繁
                     setTimeout(processNextHole, 1000);
                 } catch (error) {
                     console.error(`分类失败 (ID: ${hole.id}):`, error);
-                    updateStatus(`分类树洞 #${hole.id} 失败: ${error.message}`, true);
+                    updateGlobalStatus(`分类树洞 #${hole.id} 失败: ${error.message}`, true);
                     
                     // 延迟1秒后处理下一条，即使失败也要继续
                     setTimeout(processNextHole, 1000);
@@ -593,22 +630,85 @@ function createFloatingPanel() {
         
         // 更新状态
         if (completed) {
-            updateStatus(`批量分类完成，本次共分类 ${classifiedCount} 条树洞`);
+            updateGlobalStatus(`批量分类完成，本次共分类 ${classifiedCount} 条树洞`);
         } else {
-            updateStatus(`批量分类已停止，本次已分类 ${classifiedCount} 条树洞`);
+            updateGlobalStatus(`批量分类已停止，本次已分类 ${classifiedCount} 条树洞`);
         }
     }
+    
+    // 初始化状态元素引用
+    initStatusElement();
+}
+
+// 初始化状态文本元素的引用
+function initStatusElement() {
+    console.log("[DEBUG] initStatusElement 被调用");
+    // 首先尝试从特定ID获取元素
+    statusTextElement = document.getElementById('status-text');
+    
+    // 如果找不到，尝试从面板获取
+    if (!statusTextElement) {
+        const panel = document.getElementById('pku-treehole-panel');
+        if (panel) {
+            statusTextElement = panel.querySelector('#status-text');
+        }
+    }
+    
+    if (statusTextElement) {
+        console.log("[PKU TreeHole] 状态文本元素已找到并初始化");
+    } else {
+        console.log("[PKU TreeHole] 警告：未找到状态文本元素");
+    }
+    
+    return statusTextElement;
+}
+
+// 确保状态文本元素存在的函数
+function ensureStatusElement() {
+    console.log("[DEBUG] ensureStatusElement 被调用");
+    
+    // 如果已经有引用，直接返回
+    if (statusTextElement) {
+        console.log("[DEBUG] 已有状态元素引用");
+        return statusTextElement;
+    }
+    
+    // 尝试从DOM获取状态元素
+    return initStatusElement();
 }
 
 // 全局状态更新函数
 function updateGlobalStatus(text, isError = false) {
     console.log("[DEBUG] updateGlobalStatus 被调用");
-    if (statusTextElement) {
-        statusTextElement.style.display = 'block';
-        statusTextElement.style.background = isError ? '#ffebee' : '#e8f5e9';
-        statusTextElement.textContent = text;
+    
+    // 确保状态元素已找到
+    const statusElement = ensureStatusElement();
+    
+    if (statusElement) {
+        statusElement.style.display = 'block';
+        statusElement.style.background = isError ? '#ffebee' : '#e8f5e9';
+        statusElement.textContent = text;
     } else {
         console.log(`状态更新: ${text}${isError ? ' (错误)' : ''}`);
+    }
+}
+
+// 全局 displayHoles 函数，用于在全局作用域调用面板内的 displayHoles 函数
+let displayHolesFunction = null;
+
+// 注册 displayHoles 函数以便全局访问
+function registerDisplayHolesFunction(func) {
+    console.log("[DEBUG] registerDisplayHolesFunction 被调用");
+    displayHolesFunction = func;
+}
+
+// 全局调用 displayHoles 的包装函数
+function displayHolesGlobal(holes) {
+    console.log("[DEBUG] displayHolesGlobal 被调用");
+    if (displayHolesFunction) {
+        displayHolesFunction(holes);
+    } else {
+        console.log("[PKU TreeHole] 警告：displayHoles 函数尚未注册");
     }
 }
 
@@ -697,12 +797,20 @@ function autoScroll() {
 // 处理帖子数据
 function processHoles() {
     console.log("[DEBUG] processHoles 被调用");
+    
+    // 如果已经停止收集，直接返回
+    if (!isCollecting) {
+        console.log("[PKU TreeHole] 已停止收集，忽略 processHoles 调用");
+        return;
+    }
+    
     const holes = document.querySelectorAll('.flow-item-row');
     let newHolesCount = 0;
     let reachedTimeLimit = false;
 
     holes.forEach(hole => {
-        if (hole.dataset.processed) return;
+        // 如果已停止收集，跳过处理
+        if (!isCollecting || hole.dataset.processed) return;
 
         const likeNum = hole.querySelector('.box-header-badge.likenum');
         const replyElement = hole.querySelector('.box-header-badge .icon-reply');
@@ -722,8 +830,8 @@ function processHoles() {
             const timeMatch = headerText.match(/\d{2}-\d{2} \d{2}:\d{2}/);
             const publishTime = timeMatch ? timeMatch[0] : '';
 
-            // 检查是否达到时间限制
-            if (publishTime && endTime) {
+            // 检查是否达到时间限制 (只有在仍在收集时才检查)
+            if (isCollecting && publishTime && endTime) {
                 const currentYear = new Date().getFullYear();
                 const postTime = new Date(currentYear + '-' + publishTime.replace(' ', 'T'));
                 
@@ -865,7 +973,26 @@ function startCollection(options) {
 // 停止收集数据
 function stopCollection(updateUI = false, reason = '') {
     console.log("[DEBUG] stopCollection 被调用");
+    
+    // 防止重复调用
+    if (!isCollecting) {
+        console.log("[PKU TreeHole] 已经停止收集，忽略重复调用");
+        return;
+    }
+    
     console.log("[PKU TreeHole] 停止收集，共收集到", holesData.length, "条帖子", reason ? `，原因: ${reason}` : '');
+
+    // 检查是否因为发布时间限制而停止
+    if (reason === '达到发布时间限制') {
+        timeReachLimited = true;
+        console.log("[PKU TreeHole] 已达到发布时间限制，标记已设置");
+    }
+    
+    // 检查是否因为达到帖子数量限制而停止
+    if (reason === '达到帖子数量限制') {
+        postsReachLimited = true;
+        console.log("[PKU TreeHole] 已达到帖子数量限制，标记已设置");
+    }
 
     isCollecting = false;
     if (checkInterval) {
@@ -920,16 +1047,13 @@ function stopCollection(updateUI = false, reason = '') {
             }
             
             try {
-                // 尝试调用面板特定的updateStatus函数
-                if (typeof updateStatus === 'function') {
-                    console.log("[PKU TreeHole] 调用updateStatus函数");
-                    updateStatus(statusMessage);
-                    displayHoles(holesData);
-                } else {
-                    // 如果updateStatus不可用，使用全局状态更新
-                    console.log("[PKU TreeHole] updateStatus函数不可用，使用全局状态更新");
-                    updateGlobalStatus(statusMessage);
-                }
+                console.log("[PKU TreeHole] 调用updateGlobalStatus函数");
+                updateGlobalStatus(statusMessage);
+                
+                // 使用延时来避免可能的递归调用
+                setTimeout(() => {
+                    displayHolesGlobal(holesData);
+                }, 0);
             } catch (error) {
                 console.error("[PKU TreeHole] 更新状态时出错:", error);
                 // 尝试直接更新DOM
