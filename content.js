@@ -54,7 +54,7 @@ async function initializeApp() {
         pageInitializer.start();
         
         console.log("[PKU TreeHole] 应用初始化成功");
-        } catch (error) {
+    } catch (error) {
         console.error("[PKU TreeHole] 模块加载失败:", error);
     }
 }
