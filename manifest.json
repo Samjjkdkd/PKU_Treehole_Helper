@@ -21,12 +21,12 @@
   "content_scripts": [
     {
       "matches": ["https://treehole.pku.edu.cn/*"],
-      "css": ["floating-panel.css"],
+      "css": ["style/floating-panel.css", "style/comment-dialog.css"],
       "js": ["content.js"]
     }
   ],
   "web_accessible_resources": [{
-    "resources": ["icon/icon48.png", "assets/html2canvas.min.js", "assets/html2canvas-executor.js", "Modules/PostUI.js", "Modules/*"],
+    "resources": ["icon/icon48.png", "assets/html2canvas.min.js", "assets/html2canvas-executor.js", "Modules/PostUI.js", "Modules/*", "style/*"],
     "matches": ["https://treehole.pku.edu.cn/*"]
   }],
   "icons": {

@@ -1,0 +1,102 @@
+/* 评论图片样式 */
+.comment-images {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.comment-images img {
+    max-width: 100%;
+    margin: 5px 0;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    transition: all 0.3s ease;
+}
+
+.comment-images img:hover {
+    transform: scale(1.02);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+}
+
+/* 主贴样式 */
+.collected-comment.is-main-post {
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    border: 1px solid #e0e0e0;
+    transition: all 0.3s ease;
+}
+
+.collected-comment.is-main-post:hover {
+    box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+}
+
+.main-post-label {
+    background-color: #e0e0e0;
+    color: #555;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-left: 8px;
+}
+
+.main-post-stats {
+    display: flex;
+    margin-top: 15px;
+    background-color: rgba(0,0,0,0.03);
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.main-post-stat-item {
+    display: flex;
+    align-items: center;
+    margin-right: 20px;
+}
+
+.main-post-stat-icon {
+    margin-right: 5px;
+}
+
+/* 按钮样式 */
+.comment-collector-btn:hover {
+    opacity: 0.8;
+}
+
+#start-collect-comments:hover {
+    background-color: #1557b0;
+}
+
+/* 图标样式 */
+.collector-icon {
+    transition: transform 0.2s ease !important;
+}
+
+.comment-collector-btn:hover .collector-icon {
+    transform: scale(1.2) !important;
+}
+
+/* 按钮悬停效果 */
+.hover-effect {
+    transition: transform 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.hover-effect:hover {
+    transform: scale(1.05);
+}
+
+/* 特定按钮颜色变化 */
+#close-comment-dialog:hover {
+    color: #ff0000 !important;
+    transform: scale(1.2) !important;
+}
+
+#toggle-collect-comments:hover {
+    filter: brightness(1.1);
+}
+
+#export-text:hover, #export-image:hover, #summarize-treehole:hover {
+    filter: brightness(1.1);
+} 

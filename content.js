@@ -589,17 +589,7 @@ class TreeholeHelper {
     button.style.cursor = 'pointer';
     button.title = '收集树洞评论';
 
-    // 添加样式标签，使图标有更明显的放大效果和过渡动画
-    const iconStyle = document.createElement('style');
-    iconStyle.textContent = `
-        .collector-icon {
-            transition: transform 0.2s ease !important;
-        }
-        .comment-collector-btn:hover .collector-icon {
-            transform: scale(1.2) !important;
-        }
-    `;
-    document.head.appendChild(iconStyle);
+    // 所需的CSS样式已经包含在外部style/content.css文件中
 
     // 将按钮添加到标题栏
     const titleActions = sidebarTitle.querySelector('div');
@@ -652,31 +642,7 @@ class TreeholeHelper {
     dialog.style.overflow = 'hidden'; // 防止内容溢出
     dialog.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", sans-serif';
 
-    // 按钮的通用悬浮效果样式
-    const buttonHoverStyles = `
-        .hover-effect {
-            transition: transform 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
-        }
-        .hover-effect:hover {
-            transform: scale(1.05);
-        }
-        /* 特定按钮颜色变化 */
-        #close-comment-dialog:hover {
-            color: #ff0000 !important;
-            transform: scale(1.2) !important;
-        }
-        #toggle-collect-comments:hover {
-            filter: brightness(1.1);
-        }
-            #export-text:hover, #export-image:hover, #summarize-treehole:hover {
-            filter: brightness(1.1);
-        }
-    `;
-
-    // 创建样式元素
-    const style = document.createElement('style');
-    style.textContent = buttonHoverStyles;
-    document.head.appendChild(style);
+    // 所需的按钮悬停效果CSS样式已经包含在外部style/content.css文件中
 
     dialog.innerHTML = `
         <div id="comment-dialog-header" style="display: flex; justify-content: space-between; align-items: center; background-color: #f5f5f5; padding: 10px 15px; border-radius: 8px 8px 0 0; cursor: move; user-select: none; flex-shrink: 0;">
@@ -762,7 +728,7 @@ class TreeholeHelper {
                         </div>
                         <div style="display: flex; justify-content: flex-end; margin-top: 5px;">
                             <button id="copy-reply" class="hover-effect" style="background-color: #4CAF50; color: white; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">复制回复</button>
-                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -1490,67 +1456,22 @@ class TreeholeHelper {
 // 添加样式
     addCommentCollectorStyles() {
         console.log("[DEBUG] addCommentCollectorStyles 被调用");
-    const style = document.createElement('style');
-    style.textContent = `
-        .comment-collector-btn:hover {
-            opacity: 0.8;
+        
+        // 检查是否已添加样式
+        if (document.getElementById('content-css-link')) {
+            console.log("[PKU TreeHole] 内容CSS样式已存在，不重复添加");
+            return;
         }
-        #start-collect-comments:hover {
-            background-color: #1557b0;
-        }
-        .comment-images {
-            margin-top: 10px;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-        }
-        .comment-images img {
-            max-width: 100%;
-            margin: 5px 0;
-            border-radius: 4px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-            transition: all 0.3s ease;
-        }
-        .comment-images img:hover {
-            transform: scale(1.02);
-            box-shadow: 0 3px 10px rgba(0,0,0,0.15);
-        }
-        .collected-comment.is-main-post {
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-            border: 1px solid #e0e0e0;
-            transition: all 0.3s ease;
-        }
-        .collected-comment.is-main-post:hover {
-            box-shadow: 0 4px 15px rgba(0,0,0,0.12);
-        }
-        .main-post-label {
-            background-color: #e0e0e0;
-            color: #555;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-            margin-left: 8px;
-        }
-        .main-post-stats {
-            display: flex;
-            margin-top: 15px;
-            background-color: rgba(0,0,0,0.03);
-            padding: 10px;
-            border-radius: 4px;
-        }
-        .main-post-stat-item {
-            display: flex;
-            align-items: center;
-            margin-right: 20px;
-        }
-        .main-post-stat-icon {
-            margin-right: 5px;
-        }
-    `;
-    document.head.appendChild(style);
+        
+        // 创建link元素，引用外部CSS文件
+        const cssLink = document.createElement('link');
+        cssLink.id = 'content-css-link';
+        cssLink.rel = 'stylesheet';
+        cssLink.type = 'text/css';
+        cssLink.href = chrome.runtime.getURL('style/main.css');
+        document.head.appendChild(cssLink);
+        
+        console.log("[PKU TreeHole] 已加载内容CSS样式: style/main.css");
 }
 
 // 开始自动滚动评论页面

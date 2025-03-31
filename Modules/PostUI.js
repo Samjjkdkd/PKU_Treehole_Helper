@@ -10,66 +10,7 @@ class PostUI {
     // 在文件开头添加面板创建代码
     createFloatingPanel() {
         console.log("[DEBUG] createFloatingPanel 被调用");
-        // 创建通用的按钮悬浮效果样式
-        const floatingPanelStyles = document.createElement('style');
-        floatingPanelStyles.textContent = `
-            /* 按钮悬浮效果 */
-            .treehole-btn-hover {
-                transition: transform 0.2s ease, background-color 0.2s ease, opacity 0.2s ease !important;
-            }
-            .treehole-btn-hover:hover {
-                transform: scale(1.05) !important;
-            }
-            
-            /* 针对开始按钮的特殊效果 */
-            #start-btn:hover {
-                background-color: #0f5bdb !important;
-                filter: brightness(1.1);
-            }
-            
-            /* 针对停止按钮的特殊效果 */
-            #stop-btn:hover {
-                background-color: #d32f2f !important;
-                filter: brightness(1.1);
-            }
-            
-            /* 针对导出按钮的特殊效果 */
-            #export-text-btn:hover {
-                background-color: #2E7D32 !important;
-                filter: brightness(1.1);
-            }
-            
-            #export-image-btn:hover {
-                background-color: #1565C0 !important;
-                filter: brightness(1.1);
-            }
-            
-            /* 批量分类按钮的悬浮效果 */
-            #batch-classify-btn:hover {
-                background-color: #7B1FA2 !important;
-                filter: brightness(1.1);
-            }
-            
-            /* 小按钮的悬浮效果 */
-            .small-btn:hover {
-                transform: scale(1.1) !important;
-                background-color: #666 !important;
-            }
-            
-            /* 输入框的焦点效果 */
-            .config-item input:focus {
-                border-color: #1a73e8 !important;
-                box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2) !important;
-                transform: scale(1.02);
-            }
-            
-            /* 下拉框的悬浮效果 */
-            .sort-option select:hover {
-                border-color: #1a73e8 !important;
-                transform: scale(1.05);
-            }
-        `;
-        document.head.appendChild(floatingPanelStyles);
+        // CSS样式已移动到style/floating-panel.css文件中
 
         const panel = document.createElement('div');
         panel.id = 'pku-treehole-panel';
@@ -143,19 +84,6 @@ class PostUI {
 
         // 每分钟检查一次主题颜色，以防MutationObserver未捕获到变化
         setInterval(() => this.applyThemeToTab(), 60000);
-
-        // 对悬浮窗中的元素添加悬浮效果
-        // 为输入框添加过渡效果
-        const inputs = panel.querySelectorAll('input[type="number"], input[type="datetime-local"]');
-        inputs.forEach(input => {
-            input.style.transition = 'all 0.2s ease';
-        });
-
-        // 为下拉框添加过渡效果
-        const selects = panel.querySelectorAll('select');
-        selects.forEach(select => {
-            select.style.transition = 'all 0.2s ease';
-        });
 
         // 添加事件监听器
         const startBtn = panel.querySelector('#start-btn');
@@ -414,21 +342,6 @@ class PostUI {
                 <div class="content">${hole.content}</div>
             `;
 
-            // 设置悬浮效果样式
-            holeDiv.style.transition = 'all 0.2s ease';
-            holeDiv.onmouseover = () => {
-                holeDiv.style.transform = 'translateX(-2px) scale(1.01)';
-                holeDiv.style.backgroundColor = '#f5f8ff';
-                holeDiv.style.borderColor = '#1a73e8';
-                holeDiv.style.boxShadow = '0 2px 5px rgba(26, 115, 232, 0.1)';
-            };
-            holeDiv.onmouseout = () => {
-                holeDiv.style.transform = 'translateX(0) scale(1)';
-                holeDiv.style.backgroundColor = '';
-                holeDiv.style.borderColor = '#ddd';
-                holeDiv.style.boxShadow = 'none';
-            };
-
             // 添加点击事件
             holeDiv.addEventListener('click', () => {
                 // 查找对应的帖子元素
@@ -459,8 +372,6 @@ class PostUI {
                 }
             });
 
-            // 添加鼠标悬停效果
-            holeDiv.style.cursor = 'pointer';
             holesContainer.appendChild(holeDiv);
         });
     }

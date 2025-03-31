@@ -1,4 +1,4 @@
-#pku-treehole-panel {
+﻿#pku-treehole-panel {
     position: fixed;
     right: -400px;
     top: 50%;
@@ -325,4 +325,85 @@
     border-radius: 4px;
     display: inline-flex;
     align-items: center;
+}
+
+/* 以下是从PostUI.js提取的按钮悬浮效果样式 */
+/* 按钮悬浮效果 */
+.treehole-btn-hover {
+    transition: transform 0.2s ease, background-color 0.2s ease, opacity 0.2s ease !important;
+}
+
+.treehole-btn-hover:hover {
+    transform: scale(1.05) !important;
+}
+
+/* 针对开始按钮的特殊效果 */
+#start-btn:hover {
+    background-color: #0f5bdb !important;
+    filter: brightness(1.1);
+}
+
+/* 针对停止按钮的特殊效果 */
+#stop-btn:hover {
+    background-color: #d32f2f !important;
+    filter: brightness(1.1);
+}
+
+/* 针对导出按钮的特殊效果 */
+#export-text-btn:hover {
+    background-color: #2E7D32 !important;
+    filter: brightness(1.1);
+}
+
+#export-image-btn:hover {
+    background-color: #1565C0 !important;
+    filter: brightness(1.1);
+}
+
+/* 批量分类按钮的悬浮效果 */
+#batch-classify-btn:hover {
+    background-color: #7B1FA2 !important;
+    filter: brightness(1.1);
+}
+
+/* 小按钮的悬浮效果 */
+.small-btn:hover {
+    transform: scale(1.1) !important;
+    background-color: #666 !important;
+}
+
+/* 输入框的焦点效果 */
+.config-item input:focus {
+    border-color: #1a73e8 !important;
+    box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.2) !important;
+    transform: scale(1.02);
+}
+
+/* 下拉框的悬浮效果 */
+.sort-option select:hover {
+    border-color: #1a73e8 !important;
+    transform: scale(1.05);
+}
+
+/* 树洞项目悬浮样式 */
+.treehole-item-hover {
+    transition: all 0.2s ease;
+}
+
+.treehole-item-hover:hover {
+    transform: translateX(-2px) scale(1.01);
+    background-color: #f5f8ff;
+    border-color: #1a73e8;
+    box-shadow: 0 2px 5px rgba(26, 115, 232, 0.1);
+}
+
+/* 输入元素和下拉框的过渡效果 */
+.config-item input[type="number"],
+.config-item input[type="datetime-local"],
+.sort-option select {
+    transition: all 0.2s ease;
+}
+
+.hole-item {
+    cursor: pointer;
 } 
