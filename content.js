@@ -3,7 +3,7 @@
 
 // 使用动态导入替代静态导入
 let PostUI;
-
+let StatusUpdater;
 // 存储帖子数据
 class TreeholeHelper {
     constructor(){
@@ -20,7 +20,6 @@ class TreeholeHelper {
         this.postsReachLimited = false; // 标记是否因为达到帖子数量限制而停止收集
         this.allCommentsData = []; // 存储所有评论数据
         this.speakerList = new Set(); // 存储所有发言人列表
-        this.statusTextElement = null; // 状态文本元素引用
 
         // 评论自动滚动相关变量
         this.commentsScrollInterval = null;
@@ -44,8 +43,9 @@ class TreeholeHelper {
         this.mutationObserver = null;
     }
     
-    setPostUI(postUI){
+    setModules(postUI, statusUpdater){
         this.postUI = postUI;
+        this.statusUpdater = statusUpdater;
     }
     /*************************************post collection*************************************/ 
     
@@ -121,7 +121,7 @@ class TreeholeHelper {
                 // 检查是否已经分类
                 if (hole.category) {
                     // 已经分类，立即跳过并处理下一条
-                    this.updateGlobalStatus(`正在批量分类...已处理 ${currentIndex}/${sortedHoles.length} 条，跳过已分类树洞 #${hole.id}`);
+                    this.statusUpdater.updatePostStatus(`正在批量分类...已处理 ${currentIndex}/${sortedHoles.length} 条，跳过已分类树洞 #${hole.id}`);
                     processNextHole(); // 立即处理下一条
                     return;
                 }
@@ -169,13 +169,13 @@ class TreeholeHelper {
                     this.totalClassifiedCount++;
                     
                     // 更新状态
-                    this.updateGlobalStatus(`正在批量分类...已分类 ${this.classifiedCount} 条（总计 ${this.totalClassifiedCount} 条），当前处理 #${hole.id}`);
+                    this.statusUpdater.updatePostStatus(`正在批量分类...已分类 ${this.classifiedCount} 条（总计 ${this.totalClassifiedCount} 条），当前处理 #${hole.id}`);
                     
                     // 延迟1秒后处理下一条，避免API请求过于频繁
                     setTimeout(() => processNextHole(), 1000);
                 } catch (error) {
                     console.error(`分类失败 (ID: ${hole.id}):`, error);
-                    this.updateGlobalStatus(`分类树洞 #${hole.id} 失败: ${error.message}`, true);
+                    this.statusUpdater.updatePostStatus(`分类树洞 #${hole.id} 失败: ${error.message}`, true);
                     
                     // 延迟1秒后处理下一条，即使失败也要继续
                     setTimeout(() => processNextHole(), 1000);
@@ -211,62 +211,9 @@ class TreeholeHelper {
         
         // 更新状态
         if (completed) {
-            this.updateGlobalStatus(`批量分类完成，本次共分类 ${this.classifiedCount} 条树洞`);
+            this.statusUpdater.updatePostStatus(`批量分类完成，本次共分类 ${this.classifiedCount} 条树洞`);
         } else {
-            this.updateGlobalStatus(`批量分类已停止，本次已分类 ${this.classifiedCount} 条树洞`);
-        }
-    }
-
-    // 初始化状态文本元素的引用
-    initStatusElement () {
-        console.log("[DEBUG] initStatusElement 被调用");
-        // 首先尝试从特定ID获取元素
-        this.statusTextElement = document.getElementById('status-text');
-        
-        // 如果找不到，尝试从面板获取
-        if (!this.statusTextElement) {
-            const panel = document.getElementById('pku-treehole-panel');
-            if (panel) {
-                this.statusTextElement = panel.querySelector('#status-text');
-            }
-        }
-        
-        if (this.statusTextElement) {
-            console.log("[PKU TreeHole] 状态文本元素已找到并初始化");
-        } else {
-            console.log("[PKU TreeHole] 警告：未找到状态文本元素");
-        }
-        
-        return this.statusTextElement;
-    }
-
-    // 确保状态文本元素存在的函数
-    ensureStatusElement() {
-        console.log("[DEBUG] ensureStatusElement 被调用");
-        
-        // 如果已经有引用，直接返回
-        if (this.statusTextElement) {
-            console.log("[DEBUG] 已有状态元素引用");
-            return this.statusTextElement;
-        }
-        
-        // 尝试从DOM获取状态元素
-        return this.initStatusElement();
-    }
-
-    // 全局状态更新函数
-    updateGlobalStatus(text, isError = false) {
-        console.log("[DEBUG] updateGlobalStatus 被调用");
-        
-        // 确保状态元素已找到
-        const statusElement = this.ensureStatusElement();
-        
-        if (statusElement) {
-            statusElement.style.display = 'block';
-            statusElement.style.background = isError ? '#ffebee' : '#e8f5e9';
-            statusElement.textContent = text;
-        } else {
-            console.log(`状态更新: ${text}${isError ? ' (错误)' : ''}`);
+            this.statusUpdater.updatePostStatus(`批量分类已停止，本次已分类 ${this.classifiedCount} 条树洞`);
         }
     }
 
@@ -567,8 +514,8 @@ class TreeholeHelper {
                 }
                 
                 try {
-                    console.log("[PKU TreeHole] 调用updateGlobalStatus函数");
-                    this.updateGlobalStatus(statusMessage);
+                    console.log("[PKU TreeHole] 调用statusUpdater.updatePostStatus函数");
+                    this.statusUpdater.updatePostStatus(statusMessage);
                     
                     // 使用延时来避免可能的递归调用
                     setTimeout(() => {
@@ -587,7 +534,7 @@ class TreeholeHelper {
         } else {
                 console.log("[PKU TreeHole] 未找到面板元素");
                 // 使用全局状态更新
-                this.updateGlobalStatus(`收集完成，共 ${this.holesData.length} 条数据${reason ? ` (${reason})` : ''}`);
+                this.statusUpdater.updatePostStatus(`收集完成，共 ${this.holesData.length} 条数据${reason ? ` (${reason})` : ''}`);
                 
                 // 即使找不到面板也尝试调用displayHoles
                 this.postUI.displayHoles(this.holesData, null, null, false);
@@ -1014,18 +961,18 @@ class TreeholeHelper {
     // 获取评论容器
     const commentsContainer = document.querySelector(".sidebar-content");
     if (!commentsContainer) {
-            this.updateCommentCollectorStatus("无法找到评论容器", true);
+            this.statusUpdater.updateCommentStatus("无法找到评论容器", true);
         return;
     }
 
     // 获取所有评论元素
     const commentElements = commentsContainer.querySelectorAll(".box:not(.box-tip):not(.box33)");
     if (!commentElements || commentElements.length === 0) {
-            this.updateCommentCollectorStatus("未找到评论", true);
+            this.statusUpdater.updateCommentStatus("未找到评论", true);
         return;
     }
 
-        this.updateCommentCollectorStatus(`找到 ${commentElements.length} 条评论，正在处理...`);
+        this.statusUpdater.updateCommentStatus(`找到 ${commentElements.length} 条评论，正在处理...`);
 
     // 收集评论数据
     const comments = [];
@@ -1148,9 +1095,9 @@ class TreeholeHelper {
         
         // 根据是否有评论显示不同的信息
             if (this.totalExpectedComments > 0) {
-                this.updateCommentCollectorStatus(`开始收集评论 (共 ${this.totalExpectedComments} 条)`);
+                this.statusUpdater.updateCommentStatus(`开始收集评论 (共 ${this.totalExpectedComments} 条)`);
         } else {
-                this.updateCommentCollectorStatus(`开始收集评论 (暂无其他评论)`);
+                this.statusUpdater.updateCommentStatus(`开始收集评论 (暂无其他评论)`);
         }
     }
 
@@ -1173,7 +1120,7 @@ class TreeholeHelper {
             statusMessage = `已收集 ${collectedCount} 条评论`;
         }
         
-            this.updateCommentCollectorStatus(statusMessage);
+            this.statusUpdater.updateCommentStatus(statusMessage);
         
         // 更新评论统计数据
             this.updateCommentStats(
@@ -1184,7 +1131,7 @@ class TreeholeHelper {
         
         // 检查进度是否到达100%，如果是则自动停止收集
             if (this.totalExpectedComments > 0 && collectedCount >= this.totalExpectedComments) {
-                this.updateCommentCollectorStatus("已收集全部评论，自动停止收集");
+                this.statusUpdater.updateCommentStatus("已收集全部评论，自动停止收集");
             // 使用setTimeout来避免在collectComments函数执行过程中直接调用stopCollectComments
             setTimeout(() => {
                     if (this.isCollectingComments) {
@@ -1647,7 +1594,7 @@ class TreeholeHelper {
         });
 
         // 更新评论收集状态
-            this.updateCommentCollectorStatus("正在自动滚动加载评论...");
+            this.statusUpdater.updateCommentStatus("正在自动滚动加载评论...");
 
         // 收集当前可见的评论
             this.collectComments();
@@ -1662,7 +1609,7 @@ class TreeholeHelper {
         
         // 如果进度达到100%，停止滚动和收集
         if (progressReached100) {
-                this.updateCommentCollectorStatus("已收集全部评论，自动停止收集");
+                this.statusUpdater.updateCommentStatus("已收集全部评论，自动停止收集");
                 this.stopCollectComments(); // 停止收集评论（也会停止滚动）
             return;
         }
@@ -1675,7 +1622,7 @@ class TreeholeHelper {
                 // 如果连续3次检测到评论数量不变且在底部，认为已收集完成
                 if (stableCount >= 3) {
                         this.collectComments(); // 最后再收集一次
-                        this.updateCommentCollectorStatus("已滚动到底部，评论加载完成，停止收集");
+                        this.statusUpdater.updateCommentStatus("已滚动到底部，评论加载完成，停止收集");
                         this.stopCollectComments(); // 停止收集评论（也会停止滚动）
                     return;
                 }
@@ -1719,16 +1666,6 @@ class TreeholeHelper {
         console.log("[DEBUG] isScrolledToBottom 被调用");
     // 当滚动位置 + 可视高度 >= 总滚动高度 - 5像素（容差）时，认为已滚动到底部
     return element.scrollTop + element.clientHeight >= element.scrollHeight - 5;
-}
-
-// 更新评论收集器状态显示
-    updateCommentCollectorStatus(text, isError = false) {
-        console.log("[DEBUG] updateCommentCollectorStatus 被调用");
-    const statusElement = document.getElementById('comment-collector-status');
-    if (statusElement) {
-        statusElement.textContent = text;
-        statusElement.style.color = isError ? '#e53935' : '#333';
-    }
 }
 
 // 开始收集评论
@@ -1779,13 +1716,13 @@ class TreeholeHelper {
         this.updateCommentStats(0, 0, '-');
 
     // 开始收集
-        this.updateCommentCollectorStatus('开始收集评论...');
+        this.statusUpdater.updateCommentStatus('开始收集评论...');
         this.collectComments(true);
     
     // 立即检查是否已经收集完毕
         const nonMainPostCount = this.allCommentsData.filter(comment => !comment.isMainPost).length;
         if ((this.totalExpectedComments > 0 && nonMainPostCount >= this.totalExpectedComments) || this.totalExpectedComments === 0) {
-            this.updateCommentCollectorStatus("已收集全部评论，自动停止收集");
+            this.statusUpdater.updateCommentStatus("已收集全部评论，自动停止收集");
         setTimeout(() => {
                 if (this.isCollectingComments) {
                     this.stopCollectComments();
@@ -1833,7 +1770,7 @@ class TreeholeHelper {
                 
                 // 如果有预期总数且已达到，则立即停止
                     if (this.totalExpectedComments > 0 && currentCommentCount >= this.totalExpectedComments) {
-                        this.updateCommentCollectorStatus("已收集全部评论，自动停止收集");
+                        this.statusUpdater.updateCommentStatus("已收集全部评论，自动停止收集");
                         if (this.isCollectingComments) {
                             this.stopCollectComments();
                     }
@@ -1841,7 +1778,7 @@ class TreeholeHelper {
                 } 
                 // 如果连续多次检测到评论数量无变化，且已经收集了一些评论，则停止收集
                 else if (currentCommentCount > 0 && unchangedCount >= MAX_UNCHANGED_COUNT) {
-                        this.updateCommentCollectorStatus(`评论数量 ${currentCommentCount} 在${MAX_UNCHANGED_COUNT}秒内无变化，停止收集`);
+                        this.statusUpdater.updateCommentStatus(`评论数量 ${currentCommentCount} 在${MAX_UNCHANGED_COUNT}秒内无变化，停止收集`);
                         if (this.isCollectingComments) {
                             this.stopCollectComments();
                     }
@@ -1923,7 +1860,7 @@ class TreeholeHelper {
             this.latestCommentTime || '未知'
     );
 
-        this.updateCommentCollectorStatus(`收集完成，共 ${collectedCount} 条评论`);
+        this.statusUpdater.updateCommentStatus(`收集完成，共 ${collectedCount} 条评论`);
 }
 
 // 更新评论统计信息
@@ -2088,7 +2025,7 @@ class TreeholeHelper {
         
         // 更新评论数显示 (主贴不计入评论数)
         const nonMainPostCount = filteredComments.filter(comment => !comment.isMainPost).length;
-            this.updateCommentCollectorStatus(`已筛选 ${nonMainPostCount} 条评论`);
+            this.statusUpdater.updateCommentStatus(`已筛选 ${nonMainPostCount} 条评论`);
     }
 }
 
@@ -2199,28 +2136,28 @@ class TreeholeHelper {
             try {
                 navigator.clipboard.writeText(textContent).then(() => {
                     if (saveToLocal) {
-                            this.updateCommentCollectorStatus(`已导出 ${totalComments} 条评论为文本文件，并已复制到剪贴板`);
+                            this.statusUpdater.updateCommentStatus(`已导出 ${totalComments} 条评论为文本文件，并已复制到剪贴板`);
                     } else {
-                            this.updateCommentCollectorStatus(`已复制 ${totalComments} 条评论到剪贴板`);
+                            this.statusUpdater.updateCommentStatus(`已复制 ${totalComments} 条评论到剪贴板`);
                     }
                 }).catch(err => {
                     console.error('无法复制到剪贴板: ', err);
                     if (saveToLocal) {
-                            this.updateCommentCollectorStatus(`已导出 ${totalComments} 条评论为文本文件（复制到剪贴板失败）`);
+                            this.statusUpdater.updateCommentStatus(`已导出 ${totalComments} 条评论为文本文件（复制到剪贴板失败）`);
                     } else {
-                            this.updateCommentCollectorStatus(`复制到剪贴板失败`);
+                            this.statusUpdater.updateCommentStatus(`复制到剪贴板失败`);
                     }
                 });
             } catch (err) {
                 console.error('不支持clipboard API: ', err);
                 if (saveToLocal) {
-                        this.updateCommentCollectorStatus(`已导出 ${totalComments} 条评论为文本文件`);
+                        this.statusUpdater.updateCommentStatus(`已导出 ${totalComments} 条评论为文本文件`);
                 } else {
-                        this.updateCommentCollectorStatus(`复制到剪贴板失败（不支持clipboard API）`);
+                        this.statusUpdater.updateCommentStatus(`复制到剪贴板失败（不支持clipboard API）`);
                 }
             }
         } else {
-                this.updateCommentCollectorStatus(`已导出 ${totalComments} 条评论为文本文件`);
+                this.statusUpdater.updateCommentStatus(`已导出 ${totalComments} 条评论为文本文件`);
         }
     });
 }
@@ -2228,7 +2165,7 @@ class TreeholeHelper {
 // 导出为图片格式
     exportAsImage() {
         console.log("[DEBUG] exportAsImage 被调用");
-        this.updateCommentCollectorStatus(`导出评论数据为图片...`);
+        this.statusUpdater.updateCommentStatus(`导出评论数据为图片...`);
     // 获取评论容器
     const commentsContainer = document.getElementById('comments-container');
     if (!commentsContainer) {
@@ -2357,39 +2294,39 @@ class TreeholeHelper {
                                 const item = new ClipboardItem({ 'image/png': blob });
                                 navigator.clipboard.write([item]).then(() => {
                                     if (saveToLocal) {
-                                            this.updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}，并已复制到剪贴板`);
+                                            this.statusUpdater.updateCommentStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}，并已复制到剪贴板`);
                                         } else if (exportMode === 'copy') {
-                                            this.updateCommentCollectorStatus(`已复制 ${displayCount - 1} 条评论数据为图片${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}到剪贴板`);
+                                            this.statusUpdater.updateCommentStatus(`已复制 ${displayCount - 1} 条评论数据为图片${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}到剪贴板`);
                                     } else {
-                                            this.updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}（复制到剪贴板失败）`);
+                                            this.statusUpdater.updateCommentStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}（复制到剪贴板失败）`);
                                     }
                                 }).catch(err => {
                                     console.error('无法复制图片到剪贴板: ', err);
                                     if (saveToLocal) {
-                                            this.updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}（复制到剪贴板失败）`);
+                                            this.statusUpdater.updateCommentStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}（复制到剪贴板失败）`);
                                     } else {
-                                            this.updateCommentCollectorStatus(`复制评论数据图片到剪贴板失败`);
+                                            this.statusUpdater.updateCommentStatus(`复制评论数据图片到剪贴板失败`);
                                     }
                                 });
                             } catch (err) {
                                 console.error('ClipboardItem不受支持: ', err);
                                 if (saveToLocal) {
-                                        this.updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}`);
+                                        this.statusUpdater.updateCommentStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}`);
                                 } else {
-                                        this.updateCommentCollectorStatus(`复制到剪贴板失败（ClipboardItem不受支持）`);
+                                        this.statusUpdater.updateCommentStatus(`复制到剪贴板失败（ClipboardItem不受支持）`);
                                 }
                             }
                         });
                     } catch (err) {
                         console.error('无法使用剪贴板功能: ', err);
                         if (saveToLocal) {
-                                this.updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}`);
+                                this.statusUpdater.updateCommentStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}`);
                         } else {
-                                this.updateCommentCollectorStatus(`复制到剪贴板失败（无法使用剪贴板功能）`);
+                                this.statusUpdater.updateCommentStatus(`复制到剪贴板失败（无法使用剪贴板功能）`);
                         }
                     }
                 } else {
-                        this.updateCommentCollectorStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}`);
+                        this.statusUpdater.updateCommentStatus(`已导出 ${displayCount - 1} 条评论数据为图片文件${displayCount > MAX_COMMENTS_TO_DISPLAY ? `（仅展示前${MAX_COMMENTS_TO_DISPLAY - 1}条，共${actualCommentCount}条）` : ''}`);
                 }
             });
         })
@@ -2520,7 +2457,7 @@ class TreeholeHelper {
     exportHolesAsText() {
         console.log("[DEBUG] exportHolesAsText 被调用");
         if (!this.holesData || this.holesData.length === 0) {
-            this.updateGlobalStatus('没有可导出的数据，请先收集数据', true);
+            this.statusUpdater.updatePostStatus('没有可导出的数据，请先收集数据', true);
         return;
     }
 
@@ -2593,28 +2530,28 @@ class TreeholeHelper {
             try {
                 navigator.clipboard.writeText(textContent).then(() => {
                     if (saveToLocal) {
-                            this.updateGlobalStatus(`已导出 ${sortedHoles.length} 条帖子数据为文本文件，并已复制到剪贴板`);
+                            this.statusUpdater.updatePostStatus(`已导出 ${sortedHoles.length} 条帖子数据为文本文件，并已复制到剪贴板`);
                     } else {
-                            this.updateGlobalStatus(`已复制 ${sortedHoles.length} 条帖子数据到剪贴板`);
+                            this.statusUpdater.updatePostStatus(`已复制 ${sortedHoles.length} 条帖子数据到剪贴板`);
                     }
                 }).catch(err => {
                     console.error('无法复制到剪贴板: ', err);
                     if (saveToLocal) {
-                            this.updateGlobalStatus(`已导出 ${sortedHoles.length} 条帖子数据为文本文件（复制到剪贴板失败）`);
+                            this.statusUpdater.updatePostStatus(`已导出 ${sortedHoles.length} 条帖子数据为文本文件（复制到剪贴板失败）`);
                     } else {
-                            this.updateGlobalStatus(`复制到剪贴板失败`);
+                            this.statusUpdater.updatePostStatus(`复制到剪贴板失败`);
                     }
                 });
             } catch (err) {
                 console.error('不支持clipboard API: ', err);
                 if (saveToLocal) {
-                        this.updateGlobalStatus(`已导出 ${sortedHoles.length} 条帖子数据为文本文件`);
+                        this.statusUpdater.updatePostStatus(`已导出 ${sortedHoles.length} 条帖子数据为文本文件`);
                 } else {
-                        this.updateGlobalStatus(`复制到剪贴板失败（不支持clipboard API）`);
+                        this.statusUpdater.updatePostStatus(`复制到剪贴板失败（不支持clipboard API）`);
                 }
             }
         } else {
-                this.updateGlobalStatus(`已导出 ${sortedHoles.length} 条帖子数据为文本文件`);
+                this.statusUpdater.updatePostStatus(`已导出 ${sortedHoles.length} 条帖子数据为文本文件`);
         }
     });
 }
@@ -2622,9 +2559,9 @@ class TreeholeHelper {
 // 导出悬浮窗中的树洞数据为图片格式
     exportHolesAsImage() {
         console.log("[DEBUG] exportHolesAsImage 被调用");
-        this.updateGlobalStatus(`导出树洞数据为图片...`);
+        this.statusUpdater.updatePostStatus(`导出树洞数据为图片...`);
         if (!this.holesData || this.holesData.length === 0) {
-            this.updateGlobalStatus('没有可导出的数据，请先收集数据', true);
+            this.statusUpdater.updatePostStatus('没有可导出的数据，请先收集数据', true);
         return;
     }
 
@@ -2735,37 +2672,37 @@ class TreeholeHelper {
                                 const item = new ClipboardItem({ 'image/png': blob });
                                 navigator.clipboard.write([item]).then(() => {
                                     if (saveToLocal) {
-                                            this.updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}，并已复制到剪贴板`);
+                                            this.statusUpdater.updatePostStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}，并已复制到剪贴板`);
                                     } else {
-                                            this.updateGlobalStatus(`已复制 ${displayHoles.length} 条帖子数据为图片${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}到剪贴板`);
+                                            this.statusUpdater.updatePostStatus(`已复制 ${displayHoles.length} 条帖子数据为图片${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}到剪贴板`);
                                     }
                                 }).catch(err => {
                                     console.error('无法复制图片到剪贴板: ', err);
                                     if (saveToLocal) {
-                                            this.updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}（复制到剪贴板失败）`);
+                                            this.statusUpdater.updatePostStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}（复制到剪贴板失败）`);
                                     } else {
-                                            this.updateGlobalStatus(`复制帖子数据图片到剪贴板失败`);
+                                            this.statusUpdater.updatePostStatus(`复制帖子数据图片到剪贴板失败`);
                                     }
                                 });
                             } catch (err) {
                                 console.error('ClipboardItem不受支持: ', err);
                                 if (saveToLocal) {
-                                        this.updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+                                        this.statusUpdater.updatePostStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
                                 } else {
-                                        this.updateGlobalStatus(`复制到剪贴板失败（ClipboardItem不受支持）`);
+                                        this.statusUpdater.updatePostStatus(`复制到剪贴板失败（ClipboardItem不受支持）`);
                                 }
                             }
                         });
                     } catch (err) {
                         console.error('无法使用剪贴板功能: ', err);
                         if (saveToLocal) {
-                                this.updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+                                this.statusUpdater.updatePostStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
                         } else {
-                                this.updateGlobalStatus(`复制到剪贴板失败（无法使用剪贴板功能）`);
+                                this.statusUpdater.updatePostStatus(`复制到剪贴板失败（无法使用剪贴板功能）`);
                         }
                     }
                 } else {
-                        this.updateGlobalStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
+                        this.statusUpdater.updatePostStatus(`已导出 ${displayHoles.length} 条帖子数据为图片文件${sortedHoles.length > 30 ? '（仅展示前30条）' : ''}`);
                 }
             });
         })
@@ -2775,7 +2712,7 @@ class TreeholeHelper {
                 document.body.removeChild(tempContainer);
             }
             console.error('导出图片失败:', error);
-                this.updateGlobalStatus('导出图片失败，请重试', true);
+                this.statusUpdater.updatePostStatus('导出图片失败，请重试', true);
         });
 }
 
@@ -2846,11 +2783,11 @@ class TreeholeHelper {
     async summarizeTreehole() {
         console.log("[DEBUG] summarizeTreehole 被调用");
         try {
-            this.updateCommentCollectorStatus('正在准备总结树洞内容...');
+            this.statusUpdater.updateCommentStatus('正在准备总结树洞内容...');
             
             // 检查是否有评论数据
             if (!this.allCommentsData || this.allCommentsData.length === 0) {
-                this.updateCommentCollectorStatus('没有可用的评论数据，请先收集评论', true);
+                this.statusUpdater.updateCommentStatus('没有可用的评论数据，请先收集评论', true);
                 return;
             }
             
@@ -2859,7 +2796,7 @@ class TreeholeHelper {
             
             // 检查API设置有效性
             if (!apiSettings.apiKey) {
-                this.updateCommentCollectorStatus('请先在扩展设置中配置API KEY', true);
+                this.statusUpdater.updateCommentStatus('请先在扩展设置中配置API KEY', true);
                 return;
             }
             
@@ -2901,9 +2838,9 @@ class TreeholeHelper {
             
             // 准备树洞内容
             if (selectedSpeaker !== 'all') {
-                this.updateCommentCollectorStatus(`正在准备树洞内容（仅主贴和${selectedSpeaker}的评论）...`);
+                this.statusUpdater.updateCommentStatus(`正在准备树洞内容（仅主贴和${selectedSpeaker}的评论）...`);
             } else {
-                this.updateCommentCollectorStatus('正在准备树洞内容...');
+                this.statusUpdater.updateCommentStatus('正在准备树洞内容...');
             }
             
             // 提取主贴
@@ -2933,7 +2870,7 @@ class TreeholeHelper {
                 (apiSettings.subModel === 'deepseek-reasoner' ? 'DeepSeek-R1' : 'DeepSeek-V3') : 
                 `智谱${apiSettings.subModel.toUpperCase()}`;
             
-            this.updateCommentCollectorStatus(`正在调用${modelNameForStatus} API进行总结...`);
+            this.statusUpdater.updateCommentStatus(`正在调用${modelNameForStatus} API进行总结...`);
             
             // 根据选择的模型调用不同的API
             let summary;
@@ -2988,19 +2925,19 @@ class TreeholeHelper {
             document.getElementById('copy-summary').addEventListener('click', () => {
                 navigator.clipboard.writeText(summary)
                     .then(() => {
-                        this.updateCommentCollectorStatus('总结已复制到剪贴板');
+                        this.statusUpdater.updateCommentStatus('总结已复制到剪贴板');
                     })
                     .catch(err => {
                         console.error('复制总结失败:', err);
-                        this.updateCommentCollectorStatus('复制总结失败', true);
+                        this.statusUpdater.updateCommentStatus('复制总结失败', true);
                     });
             });
             
-            this.updateCommentCollectorStatus('树洞内容总结完成');
+            this.statusUpdater.updateCommentStatus('树洞内容总结完成');
             
         } catch (error) {
             console.error('总结树洞失败:', error);
-            this.updateCommentCollectorStatus(`总结失败: ${error.message}`, true);
+            this.statusUpdater.updateCommentStatus(`总结失败: ${error.message}`, true);
             
             // 更新总结容器显示错误
             const summaryContainer = document.getElementById('summary-container');
@@ -3157,7 +3094,7 @@ class TreeholeHelper {
     async generateTreeholeReply() {
         console.log("[DEBUG] generateTreeholeReply 被调用");
         try {
-            this.updateCommentCollectorStatus("正在生成回复...");
+            this.statusUpdater.updateCommentStatus("正在生成回复...");
             document.getElementById('generate-reply').disabled = true;
             document.getElementById('refresh-reply').disabled = true;
             
@@ -3234,10 +3171,10 @@ class TreeholeHelper {
             
             // 显示结果
             document.getElementById('generated-reply').textContent = result;
-            this.updateCommentCollectorStatus("回复生成完成！");
+            this.statusUpdater.updateCommentStatus("回复生成完成！");
         } catch (error) {
             console.error("生成回复失败:", error);
-            this.updateCommentCollectorStatus(`生成回复失败: ${error.message}`, true);
+            this.statusUpdater.updateCommentStatus(`生成回复失败: ${error.message}`, true);
             document.getElementById('generated-reply').textContent = "生成回复时出错，请重试...";
         } finally {
             document.getElementById('generate-reply').disabled = false;
@@ -3442,13 +3379,18 @@ class TreeholeHelper {
 async function initializeApp() {
     try {
         // 动态导入PostUI模块
-        const module = await import('./Modules/PostUI.js');
-        PostUI = module.default;
+        const PostUIModule = await import('./Modules/PostUI.js');
+        const StatusUpdaterModule = await import('./Modules/StatusUpdater.js');
+        
+        // 获取模块中的默认导出
+        const PostUI = PostUIModule.default;
+        const StatusUpdater = StatusUpdaterModule.default;
         
         // 初始化应用
         const treeholeHelper = new TreeholeHelper();
-        const postUI = new PostUI(treeholeHelper);
-        treeholeHelper.setPostUI(postUI);
+        const statusUpdater = new StatusUpdater();
+        const postUI = new PostUI(treeholeHelper, statusUpdater);
+        treeholeHelper.setModules(postUI, statusUpdater);
         treeholeHelper.start();
         
         console.log("[PKU TreeHole] 应用初始化成功");

@@ -1,9 +1,10 @@
 // PostUI.js - 处理树洞帖子UI显示和交互的类
 
 class PostUI {
-    constructor(postCollector) {
+    constructor(postCollector, statusUpdater) {
         this.tabElement = null; // tab元素引用
         this.postCollector = postCollector;
+        this.statusUpdater = statusUpdater;
     }
     
     // 在文件开头添加面板创建代码
@@ -216,7 +217,7 @@ class PostUI {
             if (this.postCollector.timeReachLimited) {
                 this.postCollector.timeReachLimited = false;
                 console.log("[PKU TreeHole] 时间限制已修改，重置标记");
-                this.postCollector.updateGlobalStatus('时间限制已修改，可以重新开始收集数据');
+                this.statusUpdater.updatePostStatus('时间限制已修改，可以重新开始收集数据');
             }
         });
         
@@ -225,7 +226,7 @@ class PostUI {
             if (this.postCollector.postsReachLimited) {
                 this.postCollector.postsReachLimited = false;
                 console.log("[PKU TreeHole] 帖子数量限制已修改，重置标记");
-                this.postCollector.updateGlobalStatus('帖子数量限制已修改，可以重新开始收集数据');
+                this.statusUpdater.updatePostStatus('帖子数量限制已修改，可以重新开始收集数据');
             }
         });
 
@@ -236,7 +237,7 @@ class PostUI {
             if (this.postCollector.timeReachLimited) {
                 this.postCollector.timeReachLimited = false;
                 console.log("[PKU TreeHole] 时间限制已清除，重置标记");
-                this.postCollector.updateGlobalStatus('时间限制已清除，可以重新开始收集数据');
+                this.statusUpdater.updatePostStatus('时间限制已清除，可以重新开始收集数据');
             }
 
             // 添加视觉反馈
@@ -253,14 +254,14 @@ class PostUI {
         startBtn.addEventListener('click', () => {
             // 检查是否已经达到了发布时间限制
             if (this.postCollector.timeReachLimited) {
-                this.postCollector.updateGlobalStatus('已达到发布时间限制，请修改或清除时间限制后再试', true);
+                this.statusUpdater.updatePostStatus('已达到发布时间限制，请修改或清除时间限制后再试', true);
                 // 由于我们不会隐藏开始按钮，这里不需要恢复按钮状态
                 return;
             }
             
             // 检查是否已经达到了帖子数量限制
             if (this.postCollector.postsReachLimited) {
-                this.postCollector.updateGlobalStatus('已达到帖子数量限制，请增加数量限制后再试', true);
+                this.statusUpdater.updatePostStatus('已达到帖子数量限制，请增加数量限制后再试', true);
                 return;
             }
             
@@ -287,7 +288,7 @@ class PostUI {
                             const postTime = new Date(currentYear + '-' + timeMatch[1].replace(' ', ' '));
 
                             if (endTimes > postTime) {
-                                this.postCollector.updateGlobalStatus('错误：设定的截止时间晚于当前可见帖子的发布时间', true);
+                                this.statusUpdater.updatePostStatus('错误：设定的截止时间晚于当前可见帖子的发布时间', true);
                                 startBtn.style.display = 'inline-block';
                                 stopBtn.style.display = 'none';
                                 loadingDiv.style.display = 'none';
@@ -305,9 +306,9 @@ class PostUI {
                     autoScroll: autoScrollEnabled,
                     endTime: endTimeStr ? new Date(endTimeStr) : null
                 });
-                this.postCollector.updateGlobalStatus(`开始收集数据，当前已有 ${currentCount || 0} 条数据${autoScrollEnabled ? '' : '（手动滚动模式）'}`);
+                this.statusUpdater.updatePostStatus(`开始收集数据，当前已有 ${currentCount || 0} 条数据${autoScrollEnabled ? '' : '（手动滚动模式）'}`);
             } catch (error) {
-                this.postCollector.updateGlobalStatus('收集数据失败: ' + error.message, true);
+                this.statusUpdater.updatePostStatus('收集数据失败: ' + error.message, true);
                 this.postCollector.stopCollection(true, '出现错误');
             }
         });
@@ -336,7 +337,7 @@ class PostUI {
                 const elapsedTime = (Date.now() - this.postCollector.startTime) / 1000;
                 // 获取最后一条帖子的发布时间
                 const lastTime = this.postCollector.holesData.length > 0 ? this.postCollector.holesData[this.postCollector.holesData.length - 1].publishTime : '';
-                this.postCollector.updateGlobalStatus(`已收集 ${this.postCollector.holesData.length} 条数据，用时 ${elapsedTime.toFixed(0)} 秒${lastTime ? '，最后帖子发布于 ' + lastTime : ''}`);
+                this.statusUpdater.updatePostStatus(`已收集 ${this.postCollector.holesData.length} 条数据，用时 ${elapsedTime.toFixed(0)} 秒${lastTime ? '，最后帖子发布于 ' + lastTime : ''}`);
             }
         }, 1000);
 
@@ -367,7 +368,7 @@ class PostUI {
         });
         
         // 初始化状态元素引用
-        this.postCollector.initStatusElement();
+        this.statusUpdater.initStatusElement();
     }
 
     // 显示树洞数据的方法
