@@ -1,10 +1,16 @@
 // PostUI.js - 处理树洞帖子UI显示和交互的类
 
 class PostUI {
-    constructor(postCollector, statusUpdater) {
+    constructor(dataManager, statusUpdater) {
         this.tabElement = null; // tab元素引用
-        this.postCollector = postCollector;
+        this.dataManager = dataManager;
         this.statusUpdater = statusUpdater;
+    }
+
+    setModules(exportManager, postCollector, postClassifier){
+        this.exportManager = exportManager;
+        this.postCollector = postCollector;
+        this.postClassifier = postClassifier;
     }
     
     // 在文件开头添加面板创建代码
@@ -246,49 +252,49 @@ class PostUI {
         });
 
         exportTextBtn.addEventListener('click', () => {
-            this.postCollector.exportHolesAsText();
+            this.exportManager.exportHolesAsText();
         });
 
         exportImageBtn.addEventListener('click', () => {
-            this.postCollector.exportHolesAsImage();
+            this.exportManager.exportHolesAsImage();
         });
 
         // 添加排序方式变更监听
         panel.querySelector('#sort-method').addEventListener('change', () => {
-            displayHoles(this.postCollector.holesData);
+            displayHoles(this.dataManager.holesData);
         });
 
         // 定期更新显示
         setInterval(() => {
             if (this.postCollector.isCollecting) {
-                displayHoles(this.postCollector.holesData);
+                displayHoles(this.dataManager.holesData);
                 const elapsedTime = (Date.now() - this.postCollector.startTime) / 1000;
                 // 获取最后一条帖子的发布时间
-                const lastTime = this.postCollector.holesData.length > 0 ? this.postCollector.holesData[this.postCollector.holesData.length - 1].publishTime : '';
-                this.statusUpdater.updatePostStatus(`已收集 ${this.postCollector.holesData.length} 条数据，用时 ${elapsedTime.toFixed(0)} 秒${lastTime ? '，最后帖子发布于 ' + lastTime : ''}`);
+                const lastTime = this.dataManager.holesData.length > 0 ? this.dataManager.holesData[this.dataManager.holesData.length - 1].publishTime : '';
+                this.statusUpdater.updatePostStatus(`已收集 ${this.dataManager.holesData.length} 条数据，用时 ${elapsedTime.toFixed(0)} 秒${lastTime ? '，最后帖子发布于 ' + lastTime : ''}`);
             }
         }, 1000);
 
         // 添加批量分类按钮的事件监听
         batchClassifyBtn.addEventListener('click', async () => {
             // 如果正在分类，则停止分类
-            if (this.postCollector.isClassifying) {
-                this.postCollector.stopClassifying(batchClassifyBtn);
+            if (this.postClassifier.isClassifying) {
+                this.postClassifier.stopClassifying(batchClassifyBtn);
                 return;
             }
             
             try {
-                const apiSettings = await this.postCollector.getApiSettings();
+                const apiSettings = await this.dataManager.getApiSettings();
                 if (!apiSettings.apiKey) {
                     throw new Error('请先在设置中配置API Key');
                 }
                 
-                if (this.postCollector.holesData.length === 0) {
+                if (this.dataManager.holesData.length === 0) {
                     throw new Error('暂无数据，请先收集树洞数据');
                 }
                 
                 // 开始分类
-                this.postCollector.startClassifying(apiSettings.apiKey, batchClassifyBtn, panel);
+                this.postClassifier.startClassifying(apiSettings.apiKey, batchClassifyBtn, panel);
                 
             } catch (error) {
                 alert('批量分类失败: ' + error.message);
@@ -324,7 +330,7 @@ class PostUI {
         const sortMethod = panel ? panel.querySelector('#sort-method').value : 'comprehensive';
 
         // 使用排序函数
-        const sortedHoles = this.postCollector.sortHolesByMethod(holes, sortMethod);
+        const sortedHoles = this.sortHolesByMethod(holes, sortMethod);
 
         sortedHoles.forEach(hole => {
             const holeDiv = document.createElement('div');
@@ -332,7 +338,7 @@ class PostUI {
             holeDiv.setAttribute('data-hole-id', hole.id);
             holeDiv.innerHTML = `
                 <div>
-                    ${hole.category ? `<span class="category-tag" style="display: inline-flex; align-items: center; padding: 2px 5px; border-radius: 4px; margin-right: 5px; font-size: 12px; background-color: ${this.postCollector.getCategoryColor(hole.category)}; color: white.postCollector;">${this.postCollector.getCategoryIcon(hole.category)} ${hole.category}</span>` : ''}
+                    ${hole.category ? `<span class="category-tag" style="display: inline-flex; align-items: center; padding: 2px 5px; border-radius: 4px; margin-right: 5px; font-size: 12px; background-color: ${this.postClassifier.getCategoryColor(hole.category)}; color: white;">${this.postClassifier.getCategoryIcon(hole.category)} ${hole.category}</span>` : ''}
                     <span class="hole-id">#${hole.id}</span>
                     <span class="like-count">收藏数：${hole.likeCount}</span>
                     <span class="reply-count">评论数：${hole.replyCount}</span>
@@ -398,6 +404,35 @@ class PostUI {
                 this.tabElement.dataset.theme = 'light'; // 设置数据属性表示当前是浅色主题
             }
         }
+    }
+
+    // 添加排序函数
+    sortHolesByMethod(holes, method) {
+        console.log("[DEBUG] sortHolesByMethod 被调用");
+        const sortedHoles = [...holes];
+        switch (method) {
+            case 'like':
+                sortedHoles.sort((a, b) => b.likeCount - a.likeCount);
+                break;
+            case 'reply':
+                sortedHoles.sort((a, b) => b.replyCount - a.replyCount);
+                break;
+            case 'time':
+                sortedHoles.sort((a, b) => {
+                    const timeA = a.publishTime.split(' ').reverse().join(' ');
+                    const timeB = b.publishTime.split(' ').reverse().join(' ');
+                    return timeB.localeCompare(timeA);
+                });
+                break;
+            case 'comprehensive':
+                sortedHoles.sort((a, b) => {
+                    const scoreA = a.likeCount * a.replyCount;
+                    const scoreB = b.likeCount * b.replyCount;
+                    return scoreB - scoreA;
+                });
+                break;
+        }
+        return sortedHoles;
     }
 }
 
