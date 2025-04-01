@@ -160,37 +160,41 @@ class PostCollector{
             return;
         }
 
+        scrollContainer.scrollTo({
+            top: scrollContainer.scrollHeight,
+            behavior: 'instant'
+        });
+
         let scrollCount = 0;
         const maxScrolls = 200; // 防止无限滚动
 
         // 清除可能存在的上一个滚动计时器
-            if (this.scrollInterval) {
-                clearInterval(this.scrollInterval);
+        if (this.scrollInterval) {
+            clearInterval(this.scrollInterval);
         }
 
-            this.scrollInterval = setInterval(() => {
+        this.scrollInterval = setInterval(() => {
             // 滚动页面
             scrollContainer.scrollBy(0, 5000);
             scrollCount++;
 
             // 检查是否需要停止滚动
-                const timeExpired = this.timeLimit && (Date.now() - this.startTime > this.timeLimit);
-                const reachedLimit = this.postsLimit && this.dataManager.holesData.length >= this.postsLimit;
+            const timeExpired = this.timeLimit && (Date.now() - this.startTime > this.timeLimit);
+            const reachedLimit = this.postsLimit && this.dataManager.holesData.length >= this.postsLimit;
 
             if (timeExpired || reachedLimit || scrollCount > maxScrolls) {
-                    clearInterval(this.scrollInterval);
-                    this.scrollInterval = null;
-                    this.isScrolling = false;
+                clearInterval(this.scrollInterval);
+                this.scrollInterval = null;
+                this.isScrolling = false;
 
                 if (timeExpired || reachedLimit) {
-                        let reason = '';
-                        if (timeExpired) {
-                            reason = '达到时间限制';
-                        } else if (reachedLimit) {
-                            reason = '达到数量限制';
-                        }
-                        this.stopCollection(true, reason);
-                    scrollContainer.scrollTo({ top: 0, behavior: 'smooth' });
+                    let reason = '';
+                    if (timeExpired) {
+                        reason = '达到时间限制';
+                    } else if (reachedLimit) {
+                        reason = '达到数量限制';
+                    }
+                    this.stopCollection(true, reason);
                 } else {
                     // 短暂暂停后继续滚动
                     setTimeout(() => this.autoScroll(), 2000);
@@ -201,10 +205,8 @@ class PostCollector{
 
     // 处理帖子数据
     processHoles() {
-        
         // 如果已经停止收集，直接返回
         if (!this.isCollecting) {
-            console.log("[DEBUG] 收集已停止，跳过处理帖子");
             return;
         }
         
@@ -234,14 +236,14 @@ class PostCollector{
                 const timeMatch = headerText.match(/\d{2}-\d{2} \d{2}:\d{2}/);
                 const publishTime = timeMatch ? timeMatch[0] : '';
 
-                    // 检查是否达到时间限制 (只有在仍在收集时才检查)
-                    if (this.isCollecting && publishTime && this.endTime) {
+                // 检查是否达到时间限制 (只有在仍在收集时才检查)
+                if (this.isCollecting && publishTime && this.endTime) {
                     const currentYear = new Date().getFullYear();
-                        const postTime = new Date(currentYear + '-' + publishTime.replace(' ', 'T')); 
-                        // 注意：这里的逻辑是，如果帖子时间早于或等于截止时间，则停止收集
-                        if (postTime <= this.endTime) {
-                            reachedTimeLimit = true;
-                            this.stopCollection(true, '达到发布时间限制');
+                    const postTime = new Date(currentYear + '-' + publishTime.replace(' ', 'T')); 
+                    // 注意：这里的逻辑是，如果帖子时间早于或等于截止时间，则停止收集
+                    if (postTime <= this.endTime) {
+                        reachedTimeLimit = true;
+                        this.stopCollection(true, '达到发布时间限制');
                         return;
                     }
                 }
@@ -249,7 +251,7 @@ class PostCollector{
                 // 存储数据
                 const holeData = {
                     id: id,
-                        content,
+                    content,
                     likeCount: count,
                     replyCount: replies,
                     publishTime: publishTime,
@@ -257,12 +259,12 @@ class PostCollector{
                 };
 
                 // 检查是否已存在该帖子
-                    const existingIndex = this.dataManager.holesData.findIndex(h => h.id === id);
+                const existingIndex = this.dataManager.holesData.findIndex(h => h.id === id);
                 if (existingIndex === -1) {
-                        this.dataManager.holesData.push(holeData);
+                    this.dataManager.holesData.push(holeData);
                     newHolesCount++;
                 } else {
-                        this.dataManager.holesData[existingIndex] = holeData;
+                    this.dataManager.holesData[existingIndex] = holeData;
                 }
             }
 
@@ -271,20 +273,20 @@ class PostCollector{
 
         // 检查是否需要停止收集
         if (this.isCollecting) {
-        const currentTime = Date.now();
+            const currentTime = Date.now();
             const timeExpired = this.timeLimit && (currentTime - this.startTime > this.timeLimit);
             const reachedLimit = this.postsLimit && this.dataManager.holesData.length >= this.postsLimit;
 
         if (timeExpired || reachedLimit || reachedTimeLimit) {
-                let reason = '';
-                if (timeExpired) {
-                    reason = '达到搜寻时间限制';
-                } else if (reachedLimit) {
-                    reason = '达到帖子数量限制';
-                } else if (reachedTimeLimit) {
-                    reason = '达到发布时间限制';
-                }
-                this.stopCollection(true, reason);
+            let reason = '';
+            if (timeExpired) {
+                reason = '达到搜寻时间限制';
+            } else if (reachedLimit) {
+                reason = '达到帖子数量限制';
+            } else if (reachedTimeLimit) {
+                reason = '达到发布时间限制';
+            }
+            this.stopCollection(true, reason);
             }
         }
     }   
