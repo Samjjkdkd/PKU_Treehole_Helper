@@ -19,11 +19,6 @@ class PostCollector{
         this.pageInitializer = pageInitializer;
     }
 
-    // 加载初始数据
-    loadInitialData() {
-        this.processHoles();
-    }
-
     // 开始收集数据
     startCollection(options) {
         // 如果正在收集中，先停止当前收集
@@ -42,7 +37,7 @@ class PostCollector{
         this.pageInitializer.initPageObserver();
 
         // 处理当前可见帖子
-        this.loadInitialData();
+        this.processHoles();
 
         // 启动定期检查
         if (!this.checkInterval) {
@@ -204,11 +199,12 @@ class PostCollector{
         }, 500); // 每500毫秒滚动一次
     }
 
-// 处理帖子数据
+    // 处理帖子数据
     processHoles() {
         
         // 如果已经停止收集，直接返回
         if (!this.isCollecting) {
+            console.log("[DEBUG] 收集已停止，跳过处理帖子");
             return;
         }
         
@@ -217,8 +213,8 @@ class PostCollector{
         let reachedTimeLimit = false;
 
         holes.forEach(hole => {
-                // 如果已停止收集，跳过处理
-                if (!this.isCollecting || hole.dataset.processed) return;
+            // 如果已停止收集，跳过处理
+            if (!this.isCollecting || hole.dataset.processed) return;
 
             const likeNum = hole.querySelector('.box-header-badge.likenum');
             const replyElement = hole.querySelector('.box-header-badge .icon-reply');

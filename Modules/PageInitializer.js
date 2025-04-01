@@ -34,12 +34,10 @@ class PageInitializer {
 
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
-                this.postCollector.loadInitialData();
                 this.postUI.createFloatingPanel();
                 this.commentUI.observeSidebarChanges();
             });
         } else {
-            this.postCollector.loadInitialData();
             this.postUI.createFloatingPanel();
             this.commentUI.observeSidebarChanges();
         }
