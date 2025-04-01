@@ -32,39 +32,6 @@ class PageInitializer {
             }
         });
 
-        // 监听来自popup的消息
-        chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-
-            switch (request.action) {
-                case "startCollection":
-                    try {
-                        const currentCount = this.postCollector.startCollection({
-                            timeLimit: request.timeLimit,
-                            postsLimit: request.postsLimit
-                        });
-                        sendResponse({ success: true, currentCount: currentCount });
-                    } catch (error) {
-                        console.error("[PKU TreeHole] 启动收集出错:", error);
-                        sendResponse({ success: false, error: error.message });
-                    }
-                    break;
-
-                case "stopCollection":
-                    this.postCollector.stopCollection(true, '从弹出窗口停止');
-                    sendResponse({ success: true });
-                    break;
-
-                case "getholesData":
-                    sendResponse({
-                        holes: this.dataManager.holesData,
-                        isFinished: !this.postCollector.isCollecting,
-                        count: this.dataManager.holesData.length
-                    });
-                    break;
-            }
-            return true;
-        });
-
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
                 this.postCollector.loadInitialData();
