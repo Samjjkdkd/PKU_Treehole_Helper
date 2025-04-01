@@ -6,12 +6,20 @@ class CommentReplier {
     // 自动生成对树洞的回复
     async generateTreeholeReply() {
         try {
+            // 先检查生成区域是否已显示
+            const replyGeneration = document.getElementById('reply-generation');
+            if (replyGeneration) {
+                // 如果区域存在但未显示，则显示并返回（不执行后续操作）
+                if (replyGeneration.style.display === 'none' || !replyGeneration.style.display) {
+                    replyGeneration.style.display = 'block';
+                    return; // 不继续执行后续操作
+                }
+                // 如果已经显示，继续执行后续生成回复的操作
+            }
+            
             this.statusUpdater.updateCommentStatus("正在生成回复...");
             document.getElementById('generate-reply').disabled = true;
             document.getElementById('refresh-reply').disabled = true;
-            
-            // 显示生成区域
-            document.getElementById('reply-generation').style.display = 'block';
             
             // 获取主贴内容
             const mainPost = this.dataManager.allCommentsData.find(comment => comment.isMainPost);
