@@ -17,25 +17,12 @@ class StatusUpdater{
         }
         
         return this.statusTextElement;
-    }    
-    
-    // 确保状态文本元素存在的函数
-    ensureStatusElement() {
-        
-        // 如果已经有引用，直接返回
-        if (this.statusTextElement) {
-            return this.statusTextElement;
-        }
-        
-        // 尝试从DOM获取状态元素
-        return this.initStatusElement();
     } 
 
     // 全局状态更新函数
     updatePostStatus(text, isError = false) {
-        
         // 确保状态元素已找到
-        const statusElement = this.ensureStatusElement();
+        const statusElement = this.statusTextElement;
         
         if (statusElement) {
             statusElement.style.display = 'block';
