@@ -5,7 +5,6 @@ class StatusUpdater{
 
     // 初始化状态文本元素的引用
     initStatusElement () {
-        console.log("[DEBUG] initStatusElement 被调用");
         // 首先尝试从特定ID获取元素
         this.statusTextElement = document.getElementById('status-text');
         
@@ -17,22 +16,14 @@ class StatusUpdater{
             }
         }
         
-        if (this.statusTextElement) {
-            console.log("[PKU TreeHole] 状态文本元素已找到并初始化");
-        } else {
-            console.log("[PKU TreeHole] 警告：未找到状态文本元素");
-        }
-        
         return this.statusTextElement;
     }    
     
     // 确保状态文本元素存在的函数
     ensureStatusElement() {
-        console.log("[DEBUG] ensureStatusElement 被调用");
         
         // 如果已经有引用，直接返回
         if (this.statusTextElement) {
-            console.log("[DEBUG] 已有状态元素引用");
             return this.statusTextElement;
         }
         
@@ -42,7 +33,6 @@ class StatusUpdater{
 
     // 全局状态更新函数
     updatePostStatus(text, isError = false) {
-        console.log("[DEBUG] statusUpdater.updatePostStatus 被调用");
         
         // 确保状态元素已找到
         const statusElement = this.ensureStatusElement();
@@ -51,14 +41,11 @@ class StatusUpdater{
             statusElement.style.display = 'block';
             statusElement.style.background = isError ? '#ffebee' : '#e8f5e9';
             statusElement.textContent = text;
-        } else {
-            console.log(`状态更新: ${text}${isError ? ' (错误)' : ''}`);
         }
     }
 
     // 更新评论收集器状态显示
     updateCommentStatus(text, isError = false) {
-        console.log("[DEBUG] statusUpdater.updateCommentStatus 被调用");
         const statusElement = document.getElementById('comment-collector-status');
         if (statusElement) {
             statusElement.textContent = text;

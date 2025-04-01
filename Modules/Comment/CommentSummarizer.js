@@ -5,7 +5,6 @@ class CommentSummarizer {
     }
     // 总结树洞内容
     async summarizeTreehole() {
-        console.log("[DEBUG] summarizeTreehole 被调用");
         try {
             this.statusUpdater.updateCommentStatus('正在准备总结树洞内容...');
             
@@ -183,7 +182,6 @@ class CommentSummarizer {
 
     // 调用智谱GLM-4 API进行树洞总结
     async summarizeWithZhipuAI(content, apiKey, model = 'glm-4-flash') {
-        console.log("[DEBUG] summarizeWithZhipuAI 被调用");
         try {
             const apiUrl = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
             
@@ -220,7 +218,6 @@ class CommentSummarizer {
 
     // 调用DeepSeek API进行树洞总结
     async summarizeWithDeepSeekAI(content, apiKey, model = 'deepseek-chat') {
-        console.log("[DEBUG] summarizeWithDeepSeekAI 被调用");
         try {
             const apiUrl = 'https://api.deepseek.com/v1/chat/completions';
             

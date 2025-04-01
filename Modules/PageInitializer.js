@@ -8,13 +8,11 @@ class PageInitializer {
 
     // 初始化页面监视器
     initPageObserver() {
-        console.log("[DEBUG] initPageObserver 被调用");
         // 监听整个页面的变化
         this.mutationObserver.observe(document.body, {
             childList: true,
             subtree: true
         });
-        console.log("[PKU TreeHole] 已初始化页面监视器");
     }
 
     start() {
@@ -36,7 +34,6 @@ class PageInitializer {
 
         // 监听来自popup的消息
         chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-            console.log("[PKU TreeHole] 收到消息:", request.action);
 
             switch (request.action) {
                 case "startCollection":
@@ -58,7 +55,6 @@ class PageInitializer {
                     break;
 
                 case "getholesData":
-                    console.log("[PKU TreeHole] 发送数据，数量:", this.dataManager.holesData.length);
                     sendResponse({
                         holes: this.dataManager.holesData,
                         isFinished: !this.postCollector.isCollecting,

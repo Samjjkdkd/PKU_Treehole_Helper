@@ -13,7 +13,6 @@ class CommentUI{
 
     // 监听页面变化，动态添加评论收集按钮
     observeSidebarChanges() {
-        console.log("[DEBUG] observeSidebarChanges 被调用");
         const observer = new MutationObserver((mutations) => {
             this.createCommentCollectorButton();
         });
@@ -29,7 +28,6 @@ class CommentUI{
 
     // 在原有树洞详情页后面添加新的函数
     createCommentCollectorButton() {
-        console.log("[DEBUG] createCommentCollectorButton 被调用");
         // 检查当前是否在树洞详情页
         const sidebarTitle = document.querySelector('.sidebar-title.sidebar-top');
         if (!sidebarTitle) return;
@@ -60,7 +58,6 @@ class CommentUI{
 
     // 创建评论收集对话框
     showCommentCollectorDialog() {
-        console.log("[DEBUG] showCommentCollectorDialog 被调用");
         // 检查是否已存在对话框
         let dialog = document.getElementById('comment-collector-dialog');
         if (dialog) {
@@ -227,10 +224,6 @@ class CommentUI{
 
         // 添加自动滚动复选框事件
         const autoScrollCheckbox = document.getElementById('auto-scroll-comments');
-            autoScrollCheckbox.addEventListener('change', () => {
-            // 改为仅设置状态，不触发滚动
-            console.log("[PKU TreeHole] 自动滚动设置: " + (autoScrollCheckbox.checked ? "开启" : "关闭"));
-        });
 
         // 添加筛选下拉框事件（初始状态下隐藏）
         const speakerFilter = document.getElementById('speaker-filter');
@@ -378,7 +371,6 @@ class CommentUI{
 
     // 显示评论数据
     displayComments(comments, container) {
-        console.log("[DEBUG] displayComments 被调用");
         if (!container) return;
 
             // 确保在显示评论前清空容器
@@ -507,7 +499,6 @@ class CommentUI{
 
     // 辅助函数：为发言人获取颜色
     getColorForSpeaker(speaker, colorMap) {
-        console.log("[DEBUG] getColorForSpeaker 被调用");
         if (colorMap[speaker]) {
             return colorMap[speaker];
         }

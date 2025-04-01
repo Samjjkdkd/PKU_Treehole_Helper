@@ -15,7 +15,6 @@ class PostUI {
     
     // 在文件开头添加面板创建代码
     createFloatingPanel() {
-        console.log("[DEBUG] createFloatingPanel 被调用");
         // CSS样式已移动到style/floating-panel.css文件中
 
         const panel = document.createElement('div');
@@ -150,7 +149,6 @@ class PostUI {
         endTimeInput.addEventListener('change', () => {
             if (this.postCollector.timeReachLimited) {
                 this.postCollector.timeReachLimited = false;
-                console.log("[PKU TreeHole] 时间限制已修改，重置标记");
                 this.statusUpdater.updatePostStatus('时间限制已修改，可以重新开始收集数据');
             }
         });
@@ -159,7 +157,6 @@ class PostUI {
         postsLimitInput.addEventListener('change', () => {
             if (this.postCollector.postsReachLimited) {
                 this.postCollector.postsReachLimited = false;
-                console.log("[PKU TreeHole] 帖子数量限制已修改，重置标记");
                 this.statusUpdater.updatePostStatus('帖子数量限制已修改，可以重新开始收集数据');
             }
         });
@@ -170,7 +167,6 @@ class PostUI {
             // 重置发布时间限制标记
             if (this.postCollector.timeReachLimited) {
                 this.postCollector.timeReachLimited = false;
-                console.log("[PKU TreeHole] 时间限制已清除，重置标记");
                 this.statusUpdater.updatePostStatus('时间限制已清除，可以重新开始收集数据');
             }
 
@@ -307,7 +303,6 @@ class PostUI {
 
     // 显示树洞数据的方法
     displayHoles(holes, panel, holesContainer, isExpanded) {
-        console.log("[DEBUG] displayHoles 被调用");
         if (!holes || holes.length === 0) {
             if (holesContainer) {
                 holesContainer.innerHTML = '<div class="no-data">暂无数据，请点击"开始收集数据"</div>';
@@ -384,7 +379,6 @@ class PostUI {
 
     // 检查并应用主题颜色到tab
     applyThemeToTab() {
-        console.log("[DEBUG] applyThemeToTab 被调用");
         // 检查是否存在root-dark-mode类
         const appElement = document.getElementById('app');
         const hasRootDarkMode = appElement && appElement.classList.contains('root-dark-mode');
@@ -408,7 +402,6 @@ class PostUI {
 
     // 添加排序函数
     sortHolesByMethod(holes, method) {
-        console.log("[DEBUG] sortHolesByMethod 被调用");
         const sortedHoles = [...holes];
         switch (method) {
             case 'like':

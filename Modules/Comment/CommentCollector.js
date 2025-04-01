@@ -21,7 +21,6 @@ class CommentCollector{
     }
     // 收集评论
     collectComments(isInitialCollection = false) {
-        console.log("[DEBUG] collectComments 被调用");
         // 获取评论容器
         const commentsContainer = document.querySelector(".sidebar-content");
         if (!commentsContainer) {
@@ -210,7 +209,6 @@ class CommentCollector{
 
     // 专门处理第一条帖子（树洞主贴）的函数
     extractMainPostData(postElement) {
-        console.log("[DEBUG] extractMainPostData 被调用");
         try {
             // 获取帖子ID
             const idElement = postElement.querySelector('.box-id');
@@ -269,8 +267,6 @@ class CommentCollector{
                 }
             });
             
-            console.log('提取主贴数据:', { id, stars, comments, publishTime });
-            
             return {
                 id,
                 speaker: '洞主',  // 主贴发言人一定是洞主
@@ -289,7 +285,6 @@ class CommentCollector{
 
     // 提取评论数据
     extractCommentData(commentElement) {
-        console.log("[DEBUG] extractCommentData 被调用");
         try {
             // 获取评论ID
             const idElement = commentElement.querySelector('.box-id');
@@ -386,7 +381,6 @@ class CommentCollector{
 
     // 开始自动滚动评论页面
     startCommentsAutoScroll() {
-        console.log("[DEBUG] startCommentsAutoScroll 被调用");
         if (this.isCommentsScrolling) return;
 
         this.isCommentsScrolling = true;
@@ -398,8 +392,6 @@ class CommentCollector{
                 this.isCommentsScrolling = false;
             return;
         }
-
-        console.log("[PKU TreeHole] 开始自动滚动评论...");
 
         // 清除可能存在的上一个滚动计时器
             if (this.commentsScrollInterval) {
@@ -474,7 +466,6 @@ class CommentCollector{
 
     // 停止自动滚动评论页面
     stopCommentsAutoScroll(updateCheckbox = true) {
-        console.log("[DEBUG] stopCommentsAutoScroll 被调用");
         if (this.commentsScrollInterval) {
             clearInterval(this.commentsScrollInterval);
             this.commentsScrollInterval = null;
@@ -488,20 +479,16 @@ class CommentCollector{
                 autoScrollCheckbox.checked = false;
             }
         }
-
-        console.log("[PKU TreeHole] 停止自动滚动评论");
     }
 
     // 检查是否已滚动到容器底部
     isScrolledToBottom(element) {
-        console.log("[DEBUG] isScrolledToBottom 被调用");
         // 当滚动位置 + 可视高度 >= 总滚动高度 - 5像素（容差）时，认为已滚动到底部
         return element.scrollTop + element.clientHeight >= element.scrollHeight - 5;
     }
 
     // 开始收集评论
     startCollectComments() {
-        console.log("[DEBUG] startCollectComments 被调用");
         if (this.isCollectingComments) return;
 
         // 重置变量
@@ -628,7 +615,6 @@ class CommentCollector{
 
     // 停止收集评论
     stopCollectComments() {
-        console.log("[DEBUG] stopCollectComments 被调用");
         if (!this.isCollectingComments) return;
 
         this.isCollectingComments = false;
@@ -696,7 +682,6 @@ class CommentCollector{
 
     // 更新评论统计信息
     updateCommentStats(count, timeInSeconds, latestTime) {
-        console.log("[DEBUG] updateCommentStats 被调用");
         const countElement = document.getElementById('comment-count');
         const timeElement = document.getElementById('collection-time');
         const latestTimeElement = document.getElementById('earliest-comment-time');
@@ -715,7 +700,6 @@ class CommentCollector{
 
     // 更新收集用时
     updateCollectionTime(timeInSeconds) {
-        console.log("[DEBUG] updateCollectionTime 被调用");
         const timeElement = document.getElementById('collection-time');
         if (timeElement) {
                 timeElement.textContent = this.formatTime(timeInSeconds);
@@ -724,7 +708,6 @@ class CommentCollector{
 
     // 格式化时间
     formatTime(seconds) {
-        console.log("[DEBUG] formatTime 被调用");
         if (seconds < 60) {
             return `${seconds}秒`;
         } else if (seconds < 3600) {
@@ -741,7 +724,6 @@ class CommentCollector{
 
     // 更新评论筛选下拉框
     updateSpeakerFilter() {
-        console.log("[DEBUG] updateSpeakerFilter 被调用");
         // 获取所有唯一的发言者
         const speakers = new Set();
         
@@ -826,7 +808,6 @@ class CommentCollector{
 
     // 筛选并显示评论
     filterAndDisplayComments() {
-        console.log("[DEBUG] filterAndDisplayComments 被调用");
         // 获取筛选条件
         const speakerFilter = document.getElementById('speaker-filter');
         const selectedSpeaker = speakerFilter ? speakerFilter.value : 'all';

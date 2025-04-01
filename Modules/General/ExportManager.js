@@ -8,7 +8,6 @@ class ExportManager {
 
     // 获取排序方式的中文名称
     getSortMethodName(method) {
-        console.log("[DEBUG] getSortMethodName 被调用");
         switch (method) {
             case 'like': return '按收藏数排序';
             case 'reply': return '按评论数排序';
@@ -20,7 +19,6 @@ class ExportManager {
 
     // 导出为文本格式
     exportAsText() {
-        console.log("[DEBUG] exportAsText 被调用");
         // 获取当前显示的评论
         const speakerFilter = document.getElementById('speaker-filter');
         const selectedSpeaker = speakerFilter ? speakerFilter.value : 'all';
@@ -151,7 +149,6 @@ class ExportManager {
 
     // 导出为图片格式
     exportAsImage() {
-        console.log("[DEBUG] exportAsImage 被调用");
         this.statusUpdater.updateCommentStatus(`导出评论数据为图片...`);
         // 获取评论容器
         const commentsContainer = document.getElementById('comments-container');
@@ -325,7 +322,6 @@ class ExportManager {
 
     // 动态加载html2canvas库
     loadHtml2Canvas() {
-        console.log("[DEBUG] loadHtml2Canvas 被调用");
         return new Promise((resolve, reject) => {
             // 检查是否已加载过
             if (window.__html2canvasReady) {
@@ -335,26 +331,21 @@ class ExportManager {
 
             // 注入脚本加载函数
             const injectScript = (src, onError) => {
-                console.log("[DEBUG] injectScript 被调用");
-            const script = document.createElement('script');
-            script.src = src;
-            script.onerror = onError;
-            document.head.appendChild(script);
-            return script;
+                const script = document.createElement('script');
+                script.src = src;
+                script.onerror = onError;
+                document.head.appendChild(script);
+                return script;
             }
 
             // 创建截图函数
             const createCaptureFunction = () => {
-                console.log("[DEBUG] createCaptureFunction 被调用");
                 return (element, options) => {
-                    console.log("[DEBUG] createCaptureFunction 内部被调用");
                     return new Promise((resolveCapture, rejectCapture) => {
-                        console.log("[DEBUG] createCaptureFunction 内部被调用，开始捕获");
                         const captureId = 'capture_' + Date.now();
 
                         // 监听结果
                         const captureListener = (event) => {
-                            console.log("[DEBUG] captureListener 被调用");
                             if (!event.data ||
                                 event.data.type !== 'HTML2CANVAS_RESULT' ||
                                 event.data.captureId !== captureId) return;
@@ -369,7 +360,6 @@ class ExportManager {
                             // 从数据URL创建Canvas
                             const img = new Image();
                             img.onload = () => {
-                                    console.log("[DEBUG] 捕获成功，创建canvas");
                                 const canvas = document.createElement('canvas');
                                 canvas.width = img.width;
                                 canvas.height = img.height;
@@ -410,7 +400,6 @@ class ExportManager {
 
             // 监听执行器加载完成的消息
             const executorLoadedListener = (event) => {
-                    console.log("[DEBUG] executorLoadedListener 被调用");
                 if (event.data && event.data.type === 'HTML2CANVAS_EXECUTOR_LOADED') {
                     window.removeEventListener('message', executorLoadedListener);
 
@@ -442,7 +431,6 @@ class ExportManager {
 
     // 导出悬浮窗中的树洞数据为文本格式
     exportHolesAsText() {
-        console.log("[DEBUG] exportHolesAsText 被调用");
         if (!this.dataManager.holesData || this.dataManager.holesData.length === 0) {
             this.statusUpdater.updatePostStatus('没有可导出的数据，请先收集数据', true);
             return;
@@ -545,7 +533,6 @@ class ExportManager {
 
     // 导出悬浮窗中的树洞数据为图片格式
     exportHolesAsImage() {
-        console.log("[DEBUG] exportHolesAsImage 被调用");
         this.statusUpdater.updatePostStatus(`导出树洞数据为图片...`);
         if (!this.dataManager.holesData || this.dataManager.holesData.length === 0) {
             this.statusUpdater.updatePostStatus('没有可导出的数据，请先收集数据', true);

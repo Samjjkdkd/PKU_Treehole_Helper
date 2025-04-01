@@ -12,7 +12,6 @@ class PostClassifier{
 
     // 获取分类颜色的方法
     getCategoryColor(category) {
-        console.log("[DEBUG] getCategoryColor 被调用");
         const colorMap = {
             '交友': '#E91E63', // 粉色
             '求助': '#2196F3', // 蓝色
@@ -27,7 +26,6 @@ class PostClassifier{
 
     // 获取分类图标的方法
     getCategoryIcon(category) {
-        console.log("[DEBUG] getCategoryIcon 被调用");
         const iconMap = {
             '脱单': '❤️',
             '交友': '👋',
@@ -42,7 +40,6 @@ class PostClassifier{
 
     // 开始分类的方法
     startClassifying(apiKey, batchClassifyBtn, panel) {
-        console.log("[DEBUG] startClassifying 被调用");
         if (this.isClassifying) return;
         
         this.isClassifying = true;
@@ -63,7 +60,6 @@ class PostClassifier{
         
         // 处理下一个树洞的函数
         const processNextHole = async () => {
-            console.log("[DEBUG] processNextHole 被调用");
             // 检查是否需要停止
             if (!this.isClassifying || currentIndex >= sortedHoles.length) {
                 if (this.isClassifying) {
@@ -153,7 +149,6 @@ class PostClassifier{
     
     // 停止分类的方法
     stopClassifying(batchClassifyBtn, completed = false) {
-        console.log("[DEBUG] stopClassifying 被调用");
         if (!this.isClassifying) return;
         
         this.isClassifying = false;
@@ -179,7 +174,6 @@ class PostClassifier{
     }
 
     async classifyTreehole(content, apiKey) {
-        console.log("[DEBUG] classifyTreehole 被调用");
         const categories = [
             "popi", "交友", "求助", "提问", "情感", "学习", "生活", "其他"
         ];

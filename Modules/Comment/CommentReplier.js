@@ -5,7 +5,6 @@ class CommentReplier {
     }
     // 自动生成对树洞的回复
     async generateTreeholeReply() {
-        console.log("[DEBUG] generateTreeholeReply 被调用");
         try {
             this.statusUpdater.updateCommentStatus("正在生成回复...");
             document.getElementById('generate-reply').disabled = true;
@@ -97,7 +96,6 @@ class CommentReplier {
 
     // 使用DeepSeek AI生成回复
     async generateReplyWithDeepSeekAI(content, apiKey, style, model = 'deepseek-chat', promptPrefix = '') {
-        console.log("[DEBUG] generateReplyWithDeepSeekAI 被调用");
         try {
             const apiUrl = 'https://api.deepseek.com/v1/chat/completions';
             
@@ -160,7 +158,6 @@ class CommentReplier {
 
     // 使用智谱AI生成回复
     async generateReplyWithZhipuAI(content, apiKey, style, model = 'glm-4-flash', promptPrefix = '') {
-        console.log("[DEBUG] generateReplyWithZhipuAI 被调用");
         try {
             // 根据不同风格设置不同的prompt
             let styleInstruction;

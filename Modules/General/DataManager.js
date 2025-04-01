@@ -7,7 +7,6 @@ class DataManager {
     
     // 获取导出设置
     getExportSettings() {
-        console.log("[DEBUG] getExportSettings 被调用");
         return new Promise((resolve) => {
             if (typeof chrome !== 'undefined' && chrome.storage) {
                 chrome.storage.sync.get({
@@ -25,7 +24,6 @@ class DataManager {
     
     // 获取API设置
     getApiSettings() {
-        console.log("[DEBUG] getApiSettings 被调用");
         return new Promise((resolve) => {
             if (typeof chrome !== 'undefined' && chrome.storage) {
                 chrome.storage.sync.get({
