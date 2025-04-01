@@ -198,8 +198,8 @@ class ExportManager {
         const MAX_COMMENTS_TO_DISPLAY = 101;
         const displayCount = Math.min(totalFilteredComments, MAX_COMMENTS_TO_DISPLAY);
 
+        //<h2 style="margin: 0 0 10px 0;">${holeId}</h2>
         header.innerHTML = `
-            <h2 style="margin: 0 0 10px 0;">${holeId}</h2>
             <div style="color: #666; font-size: 14px;">
                 <div>导出时间：${new Date().toLocaleString()}</div>
                     <div>评论数量：${actualCommentCount} (显示: ${displaySpeaker})</div>
@@ -214,10 +214,95 @@ class ExportManager {
         contentClone.style.border = 'none';
         contentClone.style.maxWidth = '100%';
 
-        // 只复制前MAX_COMMENTS_TO_DISPLAY条评论
-        for (let i = 0; i < displayCount; i++) {
-            if (i < filteredComments.length) {
-                contentClone.appendChild(filteredComments[i].cloneNode(true));
+        // 特殊处理第一条评论（主贴）
+        if (filteredComments.length > 0 && this.dataManager.allCommentsData.length > 0) {
+            // 找到主贴数据
+            const mainPost = this.dataManager.allCommentsData.find(comment => comment.isMainPost);
+            
+            if (mainPost && filteredComments[0]) {
+                // 创建主贴元素，使用与CommentUI.js相同的格式
+                const mainPostElement = document.createElement('div');
+                mainPostElement.className = 'collected-comment main-post';
+                mainPostElement.style.padding = '15px';
+                mainPostElement.style.marginBottom = '15px';
+                mainPostElement.style.border = '1px solid #e0e0e0';
+                mainPostElement.style.borderRadius = '8px';
+                mainPostElement.style.backgroundColor = '#f9f9f9';
+                
+                // 使用与CommentUI.js相同的HTML结构
+                mainPostElement.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div style="display: flex; align-items: center;">
+                            <span style="font-size: 18px; font-weight: bold; color: #1a1a1a;">#${mainPost.id}</span>
+                            <span style="margin-left: 8px; padding: 2px 6px; background-color:rgb(139, 139, 139); color: white; border-radius: 4px; font-size: 12px;">树洞主贴</span>
+                        </div>
+                        <span style="color: #666; font-size: 13px;">${mainPost.publishTime}</span>
+                    </div>
+                    
+                    <div style="font-size: 16px; line-height: 1.6; margin-bottom: 18px; color: #333; font-weight: 500;">${mainPost.content}</div>
+                    
+                    <div style="display: flex; gap: 20px; margin-top: 10px;">
+                        <div style="display: flex; align-items: center;">
+                            <div style="color: #ff9800; margin-right: 5px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;">
+                                    <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+                                </svg>
+                            </div>
+                            <span style="font-weight: 500; color: #555;">${mainPost.stars || 0} 收藏</span>
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <div style="color: #2196f3; margin-right: 5px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;">
+                                    <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+                                </svg>
+                            </div>
+                            <span style="font-weight: 500; color: #555;">${mainPost.comments || 0} 评论</span>
+                        </div>
+                    </div>
+                `;
+                
+                // 添加图片显示（如果存在）
+                if (mainPost.images && mainPost.images.length > 0) {
+                    const imagesDiv = document.createElement('div');
+                    imagesDiv.style.marginTop = '15px';
+                    
+                    mainPost.images.forEach(imgSrc => {
+                        const img = document.createElement('img');
+                        img.src = imgSrc;
+                        img.style.maxWidth = '100%';
+                        img.style.maxHeight = '400px';
+                        img.style.objectFit = 'contain';
+                        img.style.margin = '10px 0';
+                        img.style.borderRadius = '6px';
+                        img.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                        imagesDiv.appendChild(img);
+                    });
+                    
+                    mainPostElement.appendChild(imagesDiv);
+                }
+                
+                contentClone.appendChild(mainPostElement);
+                
+                // 只复制其余评论（从索引1开始）
+                for (let i = 1; i < displayCount; i++) {
+                    if (i < filteredComments.length) {
+                        contentClone.appendChild(filteredComments[i].cloneNode(true));
+                    }
+                }
+            } else {
+                // 如果找不到主贴或第一条不是主贴，按原来方式处理
+                for (let i = 0; i < displayCount; i++) {
+                    if (i < filteredComments.length) {
+                        contentClone.appendChild(filteredComments[i].cloneNode(true));
+                    }
+                }
+            }
+        } else {
+            // 按原来方式处理
+            for (let i = 0; i < displayCount; i++) {
+                if (i < filteredComments.length) {
+                    contentClone.appendChild(filteredComments[i].cloneNode(true));
+                }
             }
         }
 
@@ -583,7 +668,7 @@ class ExportManager {
                 <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                     <span style="font-weight: bold; color: #1a73e8;">#${hole.id}</span>
                     <div>
-                            <span style="margin-right: 15px; color: #9C27B0;">[${hole.category ? hole.category : '未分类'}]</span>
+                        ${hole.category ? `<span style="margin-right: 15px; color: #9C27B0;">[${hole.category}]</span>` : ''}
                         <span style="margin-right: 15px; color: #e91e63;">收藏数：${hole.likeCount}</span>
                         <span style="margin-right: 15px; color: #2196F3;">评论数：${hole.replyCount}</span>
                         <span style="color: #666;">${hole.publishTime}</span>

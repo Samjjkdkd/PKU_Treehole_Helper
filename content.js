@@ -52,7 +52,7 @@ async function initializeApp() {
         postCollector.setModules(pageInitializer);
 
         pageInitializer.start();
-    } catch (error) {
+        } catch (error) {
         console.error("[PKU TreeHole] 模块加载失败:", error);
     }
 }
