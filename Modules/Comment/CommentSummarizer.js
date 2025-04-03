@@ -1,4 +1,17 @@
 class CommentSummarizer {
+    static SUMMARIZE_PROMPT = `请你阅读以下PKU树洞帖子及其评论，然后提炼出主要内容和讨论的核心观点，生成一个200-300字的摘要，摘要需包含：
+
+        1. 帖子的主题或问题
+        2. 主要观点和讨论内容
+        3. 不同立场的意见（如果有分歧）
+        4. 主要有用的信息和建议（如果有）
+
+        回复格式要求：
+        - 使用简洁的语言整理，保留其中有价值的信息
+        - 不要包含"根据提供的内容"等前置语
+        - 采用客观的第三人称口吻，直接给出摘要内容
+
+        以下是需要总结的内容：\n`;
     constructor(dataManager, statusUpdater) {
         this.dataManager = dataManager;
         this.statusUpdater = statusUpdater;
@@ -51,7 +64,7 @@ class CommentSummarizer {
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="#9C27B0" style="margin-right: 8px;">
                         <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
                     </svg>
-                    树洞内容总结 (${apiSettings.aiPlatform === 'deepseek' ? 'DeepSeek' : '智谱GLM-4'})
+                    树洞内容总结 (${apiSettings.aiPlatform === 'deepseek' ? 'DeepSeek' : apiSettings.aiPlatform === 'deerapi' ? 'DeerAPI' : '智谱GLM-4'})
                     ${selectedSpeaker !== 'all' ? `<span style="font-size: 12px; color: #666; margin-left: 8px;">- 仅包含${selectedSpeaker}的评论</span>` : ''}
                 </h4>
                 <div style="padding: 10px; background-color: #fff; border-radius: 4px; border: 1px dashed #ccc;">
@@ -89,31 +102,11 @@ class CommentSummarizer {
             }
             
             // 准备好模型名称显示
-            const modelNameForStatus = apiSettings.aiPlatform === 'deepseek' ? 
-                (apiSettings.subModel === 'deepseek-reasoner' ? 'DeepSeek-R1' : 'DeepSeek-V3') : 
-                `智谱${apiSettings.subModel.toUpperCase()}`;
-            
-            this.statusUpdater.updateCommentStatus(`正在调用${modelNameForStatus} API进行总结...`);
-            
-            // 根据选择的模型调用不同的API
-            let summary;
-            if (apiSettings.aiPlatform === 'deepseek') {
-                summary = await this.summarizeWithDeepSeekAI(content, apiSettings.apiKey, apiSettings.subModel);
-            } else {
-                summary = await this.summarizeWithZhipuAI(content, apiSettings.apiKey, apiSettings.subModel);
-            }
-            
-            
-            // 获取模型名称显示
             let modelDisplayName = "";
             if (apiSettings.aiPlatform === 'deepseek') {
-                if (apiSettings.subModel === 'deepseek-chat') {
-                    modelDisplayName = "DeepSeek-V3";
-                } else if (apiSettings.subModel === 'deepseek-reasoner') {
-                    modelDisplayName = "DeepSeek-R1";
-                } else {
-                    modelDisplayName = "DeepSeek";
-                }
+                modelDisplayName = "DeepSeek";
+            } else if (apiSettings.aiPlatform === 'deerapi') {
+                modelDisplayName = "DeerAPI";
             } else {
                 // 智谱GLM型号显示
                 const modelMap = {
@@ -125,6 +118,18 @@ class CommentSummarizer {
                     'glm-4-flash': 'GLM-4-Flash'
                 };
                 modelDisplayName = modelMap[apiSettings.subModel] || '智谱GLM';
+            }
+            
+            this.statusUpdater.updateCommentStatus(`正在调用${modelDisplayName} API进行总结...`);
+            
+            // 根据当前选择的平台调用不同的API
+            let summaryResult;
+            if (apiSettings.aiPlatform === 'deepseek') {
+                summaryResult = await this.generateSummaryWithDeepSeekAI(content, apiSettings.apiKey, apiSettings.subModel);
+            } else if (apiSettings.aiPlatform === 'deerapi') {
+                summaryResult = await this.generateSummaryWithDeerAPI(content, apiSettings.apiKey, apiSettings.subModel);
+            } else { // 默认使用智谱AI
+                summaryResult = await this.generateSummaryWithZhipuAI(content, apiSettings.apiKey, apiSettings.subModel);
             }
             
             // 更新总结内容
@@ -140,13 +145,13 @@ class CommentSummarizer {
                     <button id="copy-summary" class="hover-effect" style="background-color: #9C27B0; color: white; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">复制总结</button>
                 </h4>
                 <div style="padding: 10px; background-color: #fff; border-radius: 4px; border: 1px solid #e0e0e0; line-height: 1.6;">
-                    ${summary.replace(/\n/g, '<br>')}
+                    ${summaryResult.replace(/\n/g, '<br>')}
                 </div>
             `;
             
             // 添加复制总结按钮事件
             document.getElementById('copy-summary').addEventListener('click', () => {
-                navigator.clipboard.writeText(summary)
+                navigator.clipboard.writeText(summaryResult)
                     .then(() => {
                         this.statusUpdater.updateCommentStatus('总结已复制到剪贴板');
                     })
@@ -181,11 +186,11 @@ class CommentSummarizer {
     }
 
     // 调用智谱GLM-4 API进行树洞总结
-    async summarizeWithZhipuAI(content, apiKey, model = 'glm-4-flash') {
+    async generateSummaryWithZhipuAI(content, apiKey, model = 'glm-4-flash') {
         try {
             const apiUrl = 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
             
-            const prompt = `请总结以下树洞内容的主要观点和讨论要点，提炼关键信息，生成一个简洁的摘要：\n\n${content}`;
+            const prompt = `${CommentSummarizer.SUMMARIZE_PROMPT}\n${content}`;
             
             const response = await fetch(apiUrl, {
                 method: 'POST',
@@ -217,11 +222,11 @@ class CommentSummarizer {
     }
 
     // 调用DeepSeek API进行树洞总结
-    async summarizeWithDeepSeekAI(content, apiKey, model = 'deepseek-chat') {
+    async generateSummaryWithDeepSeekAI(content, apiKey, model = 'deepseek-chat') {
         try {
             const apiUrl = 'https://api.deepseek.com/v1/chat/completions';
             
-            const prompt = `请总结以下树洞内容的主要观点和讨论要点，提炼关键信息，生成一个简洁的摘要：\n\n${content}`;
+            const prompt = `${CommentSummarizer.SUMMARIZE_PROMPT}\n${content}`;
             
             const response = await fetch(apiUrl, {
                 method: 'POST',
@@ -258,6 +263,44 @@ class CommentSummarizer {
             return data.choices[0].message.content || '无法获取总结结果';
         } catch (error) {
             console.error('调用DeepSeek API失败:', error);
+            throw error;
+        }
+    }
+
+    // 使用DeerAPI生成摘要
+    async generateSummaryWithDeerAPI(content, apiKey, model = 'gpt-4o') {
+        try {
+            const apiUrl = 'https://api.deerapi.com/v1/chat/completions';
+            
+            const prompt = `${CommentSummarizer.SUMMARIZE_PROMPT}\n${content}`;
+            
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: [
+                        {
+                            role: 'user',
+                            content: prompt
+                        }
+                    ],
+                    temperature: 0.3,
+                    max_tokens: 500
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`API请求失败: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.choices[0].message.content || '无法生成摘要';
+        } catch (error) {
+            console.error('调用DeerAPI失败:', error);
             throw error;
         }
     }

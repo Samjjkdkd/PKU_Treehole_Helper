@@ -248,10 +248,11 @@
         </div>
         
         <div class="setting-item">
-            <label class="setting-label" for="ai-model">AI平台选择：</label>
+            <label class="setting-label" for="ai-model">AI平台选择（用于总结和回复）：</label>
             <select id="ai-model">
                 <option value="deepseek">DeepSeek</option>
                 <option value="zhipu">智谱</option>
+                <option value="deerapi">DeerAPI</option>
             </select>
         </div>
         
@@ -275,12 +276,78 @@
             </select>
         </div>
         
+        <div class="setting-item" id="deerapi-model-container" style="display: none;">
+            <label class="setting-label" for="deerapi-model">DeerAPI模型：</label>
+            <select id="deerapi-model">
+                <option value="gpt-4o">GPT-4o</option>
+                <option value="gpt-4.5">GPT-4.5</option>
+                <option value="gpt-4-turbo">GPT-4-Turbo</option>
+                <option value="gpt-3.5-turbo">GPT-3.5-Turbo</option>
+                <option value="claude-3-5-sonnet">Claude-3.5-Sonnet</option>
+                <option value="claude-3-5-sonnet-latest">Claude-3.5-Sonnet-Latest</option>
+                <option value="claude-3-7-sonnet-latest">Claude-3.7-Sonnet-Latest</option>
+                <option value="claude-3-7-sonnet-thinking">Claude-3.7-Sonnet-Thinking</option>
+                <option value="claude-3-opus">Claude-3-Opus</option>
+                <option value="deepseek-chat">DeepSeek-Chat</option>
+                <option value="deepseek-reasoner">DeepSeek-Reasoner</option>
+            </select>
+        </div>
+        
         <div class="setting-item">
             <label class="setting-label" for="api-key">API KEY：</label>
-            <input type="password" id="api-key" placeholder="填写API KEY用于树洞总结功能" style="width: 100%; padding: 5px; box-sizing: border-box;">
+            <div style="display: flex; align-items: center;">
+                <input type="password" id="api-key" placeholder="填写API KEY用于树洞总结功能" style="width: 100%; padding: 5px; box-sizing: border-box;">
+                <button id="toggle-password" style="background: none; border: none; cursor: pointer; margin-left: 5px; color: #666; font-size: 16px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;">
+                    👁️
+                </button>
+            </div>
             <p class="setting-desc" style="font-size: 12px; color: #666; margin-top: 5px;">
-                支持<a href="https://api-docs.deepseek.com/zh-cn/" target="_blank">DeepSeek</a>和<a href="https://www.bigmodel.cn/dev/api/normal-model/glm-4" target="_blank">智谱GLM</a>，不同平台下的各个模型共用API KEY
+                支持<a href="https://platform.deepseek.com/api_keys" target="_blank">DeepSeek</a>、<a href="https://www.bigmodel.cn/usercenter/proj-mgmt/apikeys" target="_blank">智谱GLM</a>和<a href="https://api.deerapi.com/token" target="_blank">DeerAPI</a>，不同平台下的各个模型共用API KEY
             </p>
+        </div>
+        
+        <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
+        
+        <div class="setting-item">
+            <label class="setting-label" for="ai-classify-model">AI分类平台选择：</label>
+            <select id="ai-classify-model">
+                <option value="deepseek">DeepSeek</option>
+                <option value="zhipu">智谱</option>
+                <option value="deerapi">DeerAPI</option>
+            </select>
+        </div>
+        
+        <div class="setting-item" id="deepseek-classify-model-container" style="display: none;">
+            <label class="setting-label" for="deepseek-classify-model">DeepSeek分类模型：</label>
+            <select id="deepseek-classify-model">
+                <option value="deepseek-chat">DeepSeek-V3</option>
+                <option value="deepseek-reasoner">DeepSeek-R1</option>
+            </select>
+        </div>
+        
+        <div class="setting-item" id="zhipu-classify-model-container" style="display: none;">
+            <label class="setting-label" for="zhipu-classify-model">智谱分类模型：</label>
+            <select id="zhipu-classify-model">
+                <option value="glm-4-flash">GLM-4-Flash(免费)</option>
+                <option value="glm-4-flashx">GLM-4-FlashX</option>
+                <option value="glm-4-air">GLM-4-Air</option>
+            </select>
+        </div>
+        
+        <div class="setting-item" id="deerapi-classify-model-container" style="display: none;">
+            <label class="setting-label" for="deerapi-classify-model">DeerAPI分类模型：</label>
+            <select id="deerapi-classify-model">
+                <option value="gpt-3.5-turbo">GPT-3.5-Turbo</option>
+                <option value="gpt-4o-mini">GPT-4o-Mini</option>
+                <option value="gpt-4o">GPT-4o</option>
+                <option value="gpt-4.5">GPT-4.5</option>
+                <option value="claude-3-5-sonnet">Claude-3.5-Sonnet</option>
+                <option value="claude-3-5-sonnet-latest">Claude-3.5-Sonnet-Latest</option>
+                <option value="claude-3-7-sonnet-latest">Claude-3.7-Sonnet-Latest</option>
+                <option value="claude-3-7-sonnet-thinking">Claude-3.7-Sonnet-Thinking</option>
+                <option value="deepseek-chat">DeepSeek-Chat</option>
+                <option value="deepseek-reasoner">DeepSeek-Reasoner</option>
+            </select>
         </div>
         
         <button id="save-settings">保存设置</button>
@@ -290,9 +357,9 @@
     <div class="tab-content" id="about">
         <h1>关于</h1>
         <p>PKU TreeHole Helper 是一个帮助北大树洞用户更方便地使用树洞的浏览器扩展。</p>
-        <p>版本: 1.0</p>
+        <p>版本: <span id="extension-version">加载中...</span></p>
         <p>本扩展完全在本地运行，不会将您的数据发送到任何服务器。</p>
-        <p>如有问题或建议，请联系开发者。</p>
+        <p>如有问题或建议，请访问<a href="https://github.com/Samjjkdkd/PKU_Treehole_Helper" target="_blank">GitHub仓库</a>并联系开发者。</p>
     </div>
     
     <script src="popup.js"></script>

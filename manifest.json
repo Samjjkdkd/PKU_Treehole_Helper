@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PKU TreeHole Helper",
-  "version": "1.0",
+  "version": "2.0.0",
   "description": "帮助北大树洞用户更方便地使用树洞，支持自动滚动、收藏统计、图片分享，内容总结等功能",
   "permissions": [
     "activeTab",

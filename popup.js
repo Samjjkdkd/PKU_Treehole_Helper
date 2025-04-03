@@ -1,4 +1,3 @@
-
 async function initializePopup(){
   try {
     // 动态导入SettingManager模块
@@ -10,6 +9,7 @@ async function initializePopup(){
     const settingManager = new SettingManager();
     const settingUI = new SettingUI(settingManager);
     settingUI.init();
+
   } catch (error) {
     console.error("[PKU TreeHole] 模块加载失败:", error);
   }

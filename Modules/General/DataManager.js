@@ -52,6 +52,38 @@ class DataManager {
             }
         });
     }
+    
+    // 获取分类专用的API设置
+    getClassifyApiSettings() {
+        return new Promise((resolve) => {
+            if (typeof chrome !== 'undefined' && chrome.storage) {
+                chrome.storage.sync.get({
+                    // 默认值
+                    aiPlatform: 'deepseek',  // 用于回溯兼容
+                    classifyAiPlatform: 'zhipu',
+                    classifySubModel: 'glm-4-flash',
+                    apiKeys: {},
+                }, function(items) {
+                    const classifyPlatform = items.classifyAiPlatform || 'zhipu';
+                    const classifySubModel = items.classifySubModel || 'glm-4-flash';
+                    const apiKeys = items.apiKeys || {};
+                    
+                    resolve({
+                        aiPlatform: classifyPlatform,
+                        subModel: classifySubModel,
+                        apiKey: apiKeys[classifyPlatform] || '',
+                    });
+                });
+            } else {
+                // 如果无法访问chrome.storage，返回空值
+                resolve({
+                    aiPlatform: 'zhipu',
+                    subModel: 'glm-4-flash',
+                    apiKey: '',
+                });
+            }
+        });
+    }
 }
 
 export default DataManager;

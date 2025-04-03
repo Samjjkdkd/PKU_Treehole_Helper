@@ -1,4 +1,42 @@
 class PostClassifier{
+    // 定义分类提示词模板
+    static CLASSIFY_PROMPT_TEMPLATE = `请判断以下树洞内容属于哪个类别，只需回复类别名称，不要解释：
+        类别选项：{categories}
+
+        树洞内容：{content}`;
+
+    // 定义分类类别
+    static CATEGORIES = [
+        "popi", "交友", "求助", "提问", "情感", "学习", "生活", "其他"
+    ];
+
+    // 定义类别颜色映射
+    static CATEGORY_COLORS = {
+        '交友': '#E91E63', // 粉色
+        '聊天': '#E91E63', // 粉色
+        '求助': '#2196F3', // 蓝色
+        '提问': '#2196F3', // 蓝色
+        '情感': '#F44336', // 红色
+        '学习': '#4CAF50', // 绿色
+        '生活': '#FF9800', // 橙色
+        '其他': '#9E9E9E', // 灰色
+        'popi': '#E91E63'  // 粉色
+    };
+
+    // 定义类别图标映射
+    static CATEGORY_ICONS = {
+        '脱单': '❤️',
+        '交友': '👋',
+        '聊天': '👋',
+        '求助': '🆘',
+        '提问': '❓',
+        '情感': '😊',
+        '学习': '📚',
+        '生活': '🏠',
+        '其他': '📌',
+        'popi': '👋'
+    };
+
     constructor(dataManager, statusUpdater, postUI){
         this.dataManager = dataManager;
         this.statusUpdater = statusUpdater;
@@ -12,30 +50,12 @@ class PostClassifier{
 
     // 获取分类颜色的方法
     getCategoryColor(category) {
-        const colorMap = {
-            '交友': '#E91E63', // 粉色
-            '求助': '#2196F3', // 蓝色
-            '情感': '#F44336', // 红色
-            '学习': '#4CAF50', // 绿色
-            '生活': '#FF9800', // 橙色
-            '其他': '#9E9E9E'  // 灰色
-        };
-        
-        return colorMap[category] || '#9C27B0'; // 默认紫色
+        return PostClassifier.CATEGORY_COLORS[category] || '#9C27B0'; // 默认紫色
     }
 
     // 获取分类图标的方法
     getCategoryIcon(category) {
-        const iconMap = {
-            '脱单': '❤️',
-            '交友': '👋',
-            '情感': '😊',
-            '学习': '📚',
-            '生活': '🏠',
-            '其他': '📌'
-        };
-        
-        return iconMap[category] || '📌'; // 默认图标
+        return PostClassifier.CATEGORY_ICONS[category] || '📌'; // 默认图标
     }
 
     // 开始分类的方法
@@ -101,7 +121,7 @@ class PostClassifier{
                     if (categoryLabel) {
                         categoryLabel.innerHTML = `${this.getCategoryIcon(category)} ${category}`;
                         categoryLabel.style.backgroundColor = this.getCategoryColor(category);
-    } else {
+                    } else {
                         // 创建新的分类标签
                         const headerDiv = holeElement.querySelector('div:first-child');
                         if (headerDiv) {
@@ -174,33 +194,84 @@ class PostClassifier{
     }
 
     async classifyTreehole(content, apiKey) {
-        const categories = [
-            "popi", "交友", "求助", "提问", "情感", "学习", "生活", "其他"
-        ];
-        
-        const prompt = `请判断以下树洞内容属于哪个类别，只需回复类别名称，不要解释：
-        类别选项：${categories.join("、")}
-
-        树洞内容：${content}`;
-
         try {
-            const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify({
-                    model: 'glm-4-flash',
-                    messages: [
-                        {
-                            role: 'user',
-                            content: prompt
-                        }
-                    ],
-                    temperature: 0.1
-                })
-            });
+            // 使用类常量获取类别
+            const categories = PostClassifier.CATEGORIES;
+            
+            // 使用类常量获取提示词模板并替换变量
+            const prompt = PostClassifier.CLASSIFY_PROMPT_TEMPLATE
+                .replace('{categories}', categories.join("、"))
+                .replace('{content}', content);
+
+            // 先获取分类专用的API设置
+            const apiSettings = await this.dataManager.getClassifyApiSettings();
+            
+            // 如果没有传入API Key，则使用设置中的API Key
+            const actualApiKey = apiKey || apiSettings.apiKey;
+            if (!actualApiKey) {
+                throw new Error('未配置API Key，请在设置中配置');
+            }
+            
+            let response;
+            
+            if (apiSettings.aiPlatform === 'deerapi') {
+                // 使用DeerAPI
+                response = await fetch('https://api.deerapi.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${actualApiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: apiSettings.subModel, // 分类用快速模型
+                        messages: [
+                            {
+                                role: 'user',
+                                content: prompt
+                            }
+                        ],
+                        temperature: 0.1
+                    })
+                });
+            } else if (apiSettings.aiPlatform === 'deepseek') {
+                // 使用DeepSeek API
+                response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${actualApiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: apiSettings.subModel,
+                        messages: [
+                            {
+                                role: 'user',
+                                content: prompt
+                            }
+                        ],
+                        temperature: 0.1
+                    })
+                });
+            } else {
+                // 默认使用智谱AI
+                response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${actualApiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: apiSettings.subModel,
+                        messages: [
+                            {
+                                role: 'user',
+                                content: prompt
+                            }
+                        ],
+                        temperature: 0.1
+                    })
+                });
+            }
 
             if (!response.ok) {
                 throw new Error(`API请求失败: ${response.status}`);
