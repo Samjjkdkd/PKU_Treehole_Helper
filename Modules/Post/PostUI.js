@@ -280,7 +280,7 @@ class PostUI {
             }
             
             try {
-                const apiSettings = await this.dataManager.getApiSettings();
+                const apiSettings = await this.dataManager.getClassifyApiSettings();
                 if (!apiSettings.apiKey) {
                     throw new Error('请先在设置中配置API Key');
                 }
@@ -290,7 +290,7 @@ class PostUI {
                 }
                 
                 // 开始分类
-                this.postClassifier.startClassifying(apiSettings.apiKey, batchClassifyBtn, panel);
+                this.postClassifier.startClassifying(batchClassifyBtn, panel);
                 
             } catch (error) {
                 alert('批量分类失败: ' + error.message);

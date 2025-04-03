@@ -59,7 +59,7 @@ class PostClassifier{
     }
 
     // 开始分类的方法
-    startClassifying(apiKey, batchClassifyBtn, panel) {
+    startClassifying(batchClassifyBtn, panel) {
         if (this.isClassifying) return;
         
         this.isClassifying = true;
@@ -105,7 +105,7 @@ class PostClassifier{
                 
                 try {
                     // 执行分类 (这里会等待API响应)
-                    let category = await this.classifyTreehole(hole.content, apiKey);
+                    let category = await this.classifyTreehole(hole.content);
                     
                     if(category === 'popi'||category === '交友'){
                         category = '聊天';
@@ -193,7 +193,7 @@ class PostClassifier{
         }
     }
 
-    async classifyTreehole(content, apiKey) {
+    async classifyTreehole(content) {
         try {
             // 使用类常量获取类别
             const categories = PostClassifier.CATEGORIES;
@@ -207,13 +207,16 @@ class PostClassifier{
             const apiSettings = await this.dataManager.getClassifyApiSettings();
             
             // 如果没有传入API Key，则使用设置中的API Key
-            const actualApiKey = apiKey || apiSettings.apiKey;
+            const actualApiKey = apiSettings.apiKey;
             if (!actualApiKey) {
                 throw new Error('未配置API Key，请在设置中配置');
             }
             
             let response;
             
+            console.log(apiSettings.aiPlatform);
+            console.log(apiSettings.subModel);
+            console.log(actualApiKey);
             if (apiSettings.aiPlatform === 'deerapi') {
                 // 使用DeerAPI
                 response = await fetch('https://api.deerapi.com/v1/chat/completions', {

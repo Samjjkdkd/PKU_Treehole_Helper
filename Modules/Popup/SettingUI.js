@@ -71,7 +71,6 @@ class SettingUI {
             });
         }
     }
-
     
     // 从manifest.json获取版本号
     loadExtensionVersion() {

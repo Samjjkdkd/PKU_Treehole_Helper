@@ -20,16 +20,14 @@ class SettingManager {
         const deerapiModelContainer = document.getElementById('deerapi-model-container');
         
         // 隐藏所有模型选择器
-        deepseekModelContainer.style.display = 'none';
-        zhipuModelContainer.style.display = 'none';
-        if (deerapiModelContainer) {
-            deerapiModelContainer.style.display = 'none';
-        }
+        if (deepseekModelContainer) deepseekModelContainer.style.display = 'none';
+        if (zhipuModelContainer) zhipuModelContainer.style.display = 'none';
+        if (deerapiModelContainer) deerapiModelContainer.style.display = 'none';
         
         // 根据选择的平台显示对应的模型选择器
-        if (platform === 'deepseek') {
+        if (platform === 'deepseek' && deepseekModelContainer) {
             deepseekModelContainer.style.display = 'block';
-        } else if (platform === 'zhipu') {
+        } else if (platform === 'zhipu' && zhipuModelContainer) {
             zhipuModelContainer.style.display = 'block';
         } else if (platform === 'deerapi' && deerapiModelContainer) {
             deerapiModelContainer.style.display = 'block';
@@ -42,23 +40,15 @@ class SettingManager {
         const zhipuClassifyModelContainer = document.getElementById('zhipu-classify-model-container');
         const deerapiClassifyModelContainer = document.getElementById('deerapi-classify-model-container');
         
-        // 检查元素是否存在，防止错误
-        if (!deepseekClassifyModelContainer || !zhipuClassifyModelContainer) {
-            console.error('分类模型容器元素不存在，无法更新显示状态');
-            return;
-        }
-        
         // 隐藏所有分类模型选择器
-        deepseekClassifyModelContainer.style.display = 'none';
-        zhipuClassifyModelContainer.style.display = 'none';
-        if (deerapiClassifyModelContainer) {
-            deerapiClassifyModelContainer.style.display = 'none';
-        }
+        if (deepseekClassifyModelContainer) deepseekClassifyModelContainer.style.display = 'none';
+        if (zhipuClassifyModelContainer) zhipuClassifyModelContainer.style.display = 'none';
+        if (deerapiClassifyModelContainer) deerapiClassifyModelContainer.style.display = 'none';
         
         // 根据选择的平台显示对应的分类模型选择器
-        if (platform === 'deepseek') {
+        if (platform === 'deepseek' && deepseekClassifyModelContainer) {
             deepseekClassifyModelContainer.style.display = 'block';
-        } else if (platform === 'zhipu') {
+        } else if (platform === 'zhipu' && zhipuClassifyModelContainer) {
             zhipuClassifyModelContainer.style.display = 'block';
         } else if (platform === 'deerapi' && deerapiClassifyModelContainer) {
             deerapiClassifyModelContainer.style.display = 'block';
@@ -112,11 +102,6 @@ class SettingManager {
             // 只有当密钥不为空时才保存，避免清空已保存的密钥
             if (apiKey) {
                 apiKeys[aiPlatform] = apiKey;
-                
-                // 同时为分类平台保存相同的API Key（如果与主平台不同）
-                if (classifyAiPlatform !== aiPlatform) {
-                    apiKeys[classifyAiPlatform] = apiKey;
-                }
             }
             
             // 保存设置
