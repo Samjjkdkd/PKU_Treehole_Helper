@@ -534,7 +534,7 @@ class ExportManager {
         // 获取最早和最新的帖子时间
         const timeData = this.dataManager.holesData.map(hole => {
             const parts = hole.publishTime.split(' ');
-            return parts.length > 1 ? parts[1] + ' ' + parts[0] : hole.publishTime;
+            return parts.length > 1 ? parts[0] + ' ' + parts[1] : hole.publishTime;
         }).sort();
 
         if (timeData.length > 0) {
