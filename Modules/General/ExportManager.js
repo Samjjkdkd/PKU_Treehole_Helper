@@ -99,7 +99,7 @@ class ExportManager {
             const url = URL.createObjectURL(blob);
             
             // 设置文件名
-            const fileName = `TreeHole${holeId.replace('#', '')}_${new Date().getTime()}.txt`;
+            const fileName = `TreeHole${holeId.replace('#', '')}_${new Date().toLocaleString()}.txt`;
             
             // 创建并触发下载
             const a = document.createElement('a');
@@ -350,7 +350,7 @@ class ExportManager {
                     // 设置文件名
                     const link = document.createElement('a');
                     link.href = imgData;
-                    link.download = `PKU_TreeHole_导出_${new Date().getTime()}.png`;
+                    link.download = `PKU_TreeHole_导出_${new Date().toLocaleString()}.png`;
                     link.click();
                 }
                 
@@ -568,7 +568,7 @@ class ExportManager {
                 const url = URL.createObjectURL(blob);
                 
                 // 设置文件名
-                const fileName = `PKU_TreeHole_导出_${new Date().getTime()}.txt`;
+                const fileName = `PKU_TreeHole_导出_${new Date().toLocaleString()}.txt`;
                 
                 // 创建并触发下载
                 const a = document.createElement('a');
@@ -719,7 +719,7 @@ class ExportManager {
                 if (saveToLocal) {
                     const link = document.createElement('a');
                     link.href = imgData;
-                    link.download = `PKU_TreeHole_导出_${new Date().getTime()}.png`;
+                    link.download = `PKU_TreeHole_导出_${new Date().toLocaleString()}.png`;
                     link.click();
                 }
                 
